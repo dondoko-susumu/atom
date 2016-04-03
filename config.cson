@@ -1,0 +1,22 @@
+"*":
+  "atom-autocomplete-php": {}
+  core:
+    disabledPackages: [
+      "wrap-guide"
+    ]
+    themes: [
+      "atom-dark-ui"
+      "atom-dark-syntax"
+    ]
+  editor:
+    fontFamily: "\"Ricty\""
+    fontSize: 16
+    invisibles: {}
+    lineHeight: 1.3
+    showIndentGuide: true
+    showInvisibles: true
+  "exception-reporting":
+    userId: "81481ca1-a40d-cbe8-c8a5-025f76f1e8fa"
+  "git-plus": {}
+  welcome:
+    showOnStartup: false
