@@ -1,5 +1,59 @@
 "*":
   "atom-autocomplete-php": {}
+  "atom-beautify":
+    apex: {}
+    arduino: {}
+    c: {}
+    cfml: {}
+    coffeescript: {}
+    cpp: {}
+    cs: {}
+    css:
+      indent_size: 2
+    d: {}
+    ejs: {}
+    erb: {}
+    fortran: {}
+    general:
+      _analyticsUserId: "778ac23a-ba20-4531-8675-b364df939301"
+    gherkin: {}
+    handlebars: {}
+    html:
+      indent_size: 2
+    jade: {}
+    java: {}
+    js:
+      indent_size: 2
+    json: {}
+    jsx: {}
+    latex: {}
+    less: {}
+    marko: {}
+    mustache: {}
+    objectivec: {}
+    pawn: {}
+    perl: {}
+    php:
+      cs_fixer_path: "/usr/local/bin/"
+      fixers: "-indentation,-braces"
+      level: "psr2"
+    python: {}
+    riot: {}
+    ruby: {}
+    rust: {}
+    sass: {}
+    scss: {}
+    spacebars: {}
+    sql: {}
+    svg: {}
+    swig: {}
+    tss: {}
+    twig: {}
+    typescript: {}
+    vala: {}
+    visualforce: {}
+    xml: {}
+    xtemplate: {}
   core:
     disabledPackages: [
       "wrap-guide"
@@ -10,7 +64,7 @@
     ]
   editor:
     fontFamily: "\"Ricty\""
-    fontSize: 16
+    fontSize: 17
     invisibles: {}
     lineHeight: 1.3
     showIndentGuide: true
@@ -18,5 +72,7 @@
   "exception-reporting":
     userId: "81481ca1-a40d-cbe8-c8a5-025f76f1e8fa"
   "git-plus": {}
+  linter:
+    showErrorPanel: false
   welcome:
     showOnStartup: false
