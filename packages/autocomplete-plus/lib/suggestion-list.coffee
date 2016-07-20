@@ -6,13 +6,13 @@ class SuggestionList
   wordPrefixRegex: null
 
   constructor: ->
-    @active = false
+    @activeEditor = null
     @emitter = new Emitter
     @subscriptions = new CompositeDisposable
     @subscriptions.add atom.commands.add 'atom-text-editor.autocomplete-active',
       'autocomplete-plus:confirm': @confirmSelection,
+      'autocomplete-plus:confirmIfNonDefault': @confirmSelectionIfNonDefault,
       'autocomplete-plus:cancel': @cancel
-    @subscriptions.add atom.config.observe 'autocomplete-plus.useCoreMovementCommands', => @bindToMovementCommands()
     @subscriptions.add(atom.config.observe('autocomplete-plus.enableExtendedUnicodeSupport', (enableExtendedUnicodeSupport) =>
       if enableExtendedUnicodeSupport
         @wordPrefixRegex = new RegExp("^[#{UnicodeLetters}\\d_-]")
@@ -20,7 +20,24 @@ class SuggestionList
         @wordPrefixRegex = /^[\w-]/
     ))
 
-  bindToMovementCommands: ->
+  addBindings: (editor) ->
+    @bindings?.dispose()
+    @bindings = new CompositeDisposable
+
+    completionKey = atom.config.get('autocomplete-plus.confirmCompletion') or ''
+
+    keys = {}
+    keys['tab'] = 'autocomplete-plus:confirm' if completionKey.indexOf('tab') > -1
+    if completionKey.indexOf('enter') > -1
+      if completionKey.indexOf('always') > -1
+        keys['enter'] = 'autocomplete-plus:confirmIfNonDefault'
+      else
+        keys['enter'] = 'autocomplete-plus:confirm'
+
+    @bindings.add atom.keymaps.add(
+      'atom-text-editor.autocomplete-active',
+      {'atom-text-editor.autocomplete-active': keys})
+
     useCoreMovementCommands = atom.config.get('autocomplete-plus.useCoreMovementCommands')
     commandNamespace = if useCoreMovementCommands then 'core' else 'autocomplete-plus'
 
@@ -50,25 +67,12 @@ class SuggestionList
         @selectBottom()
         event.stopImmediatePropagation()
 
-    @movementCommandSubscriptions?.dispose()
-    @movementCommandSubscriptions = new CompositeDisposable
-    @movementCommandSubscriptions.add atom.commands.add('atom-text-editor.autocomplete-active', commands)
+    @bindings.add atom.commands.add(
+      atom.views.getView(editor), commands)
 
-  addKeyboardInteraction: ->
-    @removeKeyboardInteraction()
-    completionKey = atom.config.get('autocomplete-plus.confirmCompletion') or ''
-
-    keys = {}
-    keys['tab'] = 'autocomplete-plus:confirm' if completionKey.indexOf('tab') > -1
-    keys['enter'] = 'autocomplete-plus:confirm' if completionKey.indexOf('enter') > -1
-
-    @keymaps = atom.keymaps.add('atom-text-editor.autocomplete-active', {'atom-text-editor.autocomplete-active': keys})
-    @subscriptions.add(@keymaps)
-
-  removeKeyboardInteraction: ->
-    @keymaps?.dispose()
-    @keymaps = null
-    @subscriptions.remove(@keymaps)
+    @bindings.add(
+      atom.config.onDidChange 'autocomplete-plus.useCoreMovementCommands', =>
+        @addBindings(editor))
 
   ###
   Section: Event Triggers
@@ -82,6 +86,9 @@ class SuggestionList
 
   confirmSelection: =>
     @emitter.emit('did-confirm-selection')
+
+  confirmSelectionIfNonDefault: (event) =>
+    @emitter.emit('did-confirm-selection-if-non-default', event)
 
   selectNext: ->
     @emitter.emit('did-select-next')
@@ -107,6 +114,9 @@ class SuggestionList
 
   onDidConfirmSelection: (fn) ->
     @emitter.on('did-confirm-selection', fn)
+
+  onDidconfirmSelectionIfNonDefault: (fn) ->
+    @emitter.on('did-confirm-selection-if-non-default', fn)
 
   onDidConfirm: (fn) ->
     @emitter.on('did-confirm', fn)
@@ -139,7 +149,7 @@ class SuggestionList
     @emitter.on('did-change-items', fn)
 
   isActive: ->
-    @active
+    @activeEditor?
 
   show: (editor, options) =>
     if atom.config.get('autocomplete-plus.suggestionListFollows') is 'Cursor'
@@ -160,32 +170,32 @@ class SuggestionList
     bufferPosition = editor.getCursorBufferPosition()
     bufferPosition = bufferPosition.translate([0, -prefix.length]) if followRawPrefix or @wordPrefixRegex.test(prefix)
 
-    if @active
+    if @activeEditor is editor
       unless bufferPosition.isEqual(@displayBufferPosition)
         @displayBufferPosition = bufferPosition
         @suggestionMarker?.setBufferRange([bufferPosition, bufferPosition])
     else
       @destroyOverlay()
+      @activeEditor = editor
       @displayBufferPosition = bufferPosition
       marker = @suggestionMarker = editor.markBufferRange([bufferPosition, bufferPosition])
       @overlayDecoration = editor.decorateMarker(marker, {type: 'overlay', item: this, position: 'tail'})
-      @addKeyboardInteraction()
-      @active = true
+      @addBindings(editor)
 
   showAtCursorPosition: (editor) =>
-    return if @active or not editor?
+    return if @activeEditor is editor or not editor?
     @destroyOverlay()
 
     if marker = editor.getLastCursor()?.getMarker()
+      @activeEditor = editor
       @overlayDecoration = editor.decorateMarker(marker, {type: 'overlay', item: this})
-      @addKeyboardInteraction()
-      @active = true
+      @addBindings(editor)
 
   hide: =>
-    return unless @active
+    return if @activeEditor is null
     @destroyOverlay()
-    @removeKeyboardInteraction()
-    @active = false
+    @bindings?.dispose()
+    @activeEditor = null
 
   destroyOverlay: =>
     if @suggestionMarker?
@@ -201,6 +211,6 @@ class SuggestionList
   # Public: Clean up, stop listening to events
   dispose: ->
     @subscriptions.dispose()
-    @movementCommandSubscriptions?.dispose()
+    @bindings?.dispose()
     @emitter.emit('did-dispose')
     @emitter.dispose()

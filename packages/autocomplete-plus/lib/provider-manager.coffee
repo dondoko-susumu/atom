@@ -5,6 +5,7 @@ semver = require 'semver'
 stableSort = require 'stable'
 
 {selectorsMatchScopeChain} = require('./scope-helpers')
+{API_VERSION} = require './private-symbols'
 
 # Deferred requires
 SymbolProvider = null
@@ -36,36 +37,59 @@ class ProviderManager
     @globalBlacklist = null
     @providers = null
 
-  providersForScopeDescriptor: (scopeDescriptor) =>
+  applicableProviders: (editor, scopeDescriptor) =>
+    providers = @filterProvidersByEditor(@providers, editor)
+    providers = @filterProvidersByScopeDescriptor(providers, scopeDescriptor)
+    providers = @sortProviders(providers, scopeDescriptor)
+    providers = @filterProvidersByExcludeLowerPriority(providers)
+    @removeMetadata(providers)
+
+  filterProvidersByScopeDescriptor: (providers, scopeDescriptor) ->
     scopeChain = scopeChainForScopeDescriptor(scopeDescriptor)
     return [] unless scopeChain
     return [] if @globalBlacklistSelectors? and selectorsMatchScopeChain(@globalBlacklistSelectors, scopeChain)
 
     matchingProviders = []
     disableDefaultProvider = false
-    lowestIncludedPriority = 0
-
-    for providerMetadata in @providers
+    defaultProviderMetadata = null
+    for providerMetadata in providers
       {provider} = providerMetadata
+      if provider is @defaultProvider
+        defaultProviderMetadata = providerMetadata
       if providerMetadata.matchesScopeChain(scopeChain)
-        matchingProviders.push(provider)
-        if provider.excludeLowerPriority
-          lowestIncludedPriority = Math.max(lowestIncludedPriority, provider.inclusionPriority ? 0)
+        matchingProviders.push(providerMetadata)
         if providerMetadata.shouldDisableDefaultProvider(scopeChain)
           disableDefaultProvider = true
 
     if disableDefaultProvider
-      index = matchingProviders.indexOf(@defaultProvider)
+      index = matchingProviders.indexOf(defaultProviderMetadata)
       matchingProviders.splice(index, 1) if index > -1
+    matchingProviders
 
-    matchingProviders = (provider for provider in matchingProviders when (provider.inclusionPriority ? 0) >= lowestIncludedPriority)
-    stableSort matchingProviders, (providerA, providerB) =>
-      difference = (providerB.suggestionPriority ? 1) - (providerA.suggestionPriority ? 1)
+  sortProviders: (providers, scopeDescriptor) ->
+    scopeChain = scopeChainForScopeDescriptor(scopeDescriptor)
+    stableSort providers, (providerA, providerB) ->
+      difference = (providerB.provider.suggestionPriority ? 1) - (providerA.provider.suggestionPriority ? 1)
       if difference is 0
-        specificityA = @metadataForProvider(providerA).getSpecificity(scopeChain)
-        specificityB = @metadataForProvider(providerB).getSpecificity(scopeChain)
+        specificityA = providerA.getSpecificity(scopeChain)
+        specificityB = providerB.getSpecificity(scopeChain)
         difference = specificityB - specificityA
       difference
+
+  filterProvidersByEditor: (providers, editor) ->
+    providers.filter((providerMetadata) ->
+      providerMetadata.matchesEditor(editor))
+
+  filterProvidersByExcludeLowerPriority: (providers) ->
+    lowestAllowedPriority = 0
+    for providerMetadata in providers
+      {provider} = providerMetadata
+      if provider.excludeLowerPriority
+        lowestAllowedPriority = Math.max(lowestAllowedPriority, provider.inclusionPriority ? 0)
+    providerMetadata for providerMetadata in providers when (providerMetadata.provider.inclusionPriority ? 0) >= lowestAllowedPriority
+
+  removeMetadata: (providers) ->
+    providers.map((providerMetadata) -> providerMetadata.provider)
 
   toggleDefaultProvider: (enabled) =>
     return unless enabled?
@@ -93,7 +117,10 @@ class ProviderManager
   isValidProvider: (provider, apiVersion) ->
     # TODO API: Check based on the apiVersion
     if semver.satisfies(apiVersion, '>=2.0.0')
-      provider? and isFunction(provider.getSuggestions) and isString(provider.selector) and !!provider.selector.length
+      provider? and
+      isFunction(provider.getSuggestions) and
+      ((isString(provider.selector) and !!provider.selector.length) or
+       (isString(provider.scopeSelector) and !!provider.scopeSelector.length))
     else
       provider? and isFunction(provider.requestHandler) and isString(provider.selector) and !!provider.selector.length
 
@@ -108,7 +135,7 @@ class ProviderManager
   isProviderRegistered: (provider) ->
     @metadataForProvider(provider)?
 
-  addProvider: (provider, apiVersion='2.0.0') =>
+  addProvider: (provider, apiVersion='3.0.0') =>
     return if @isProviderRegistered(provider)
     ProviderMetadata ?= require './provider-metadata'
     @providers.push new ProviderMetadata(provider, apiVersion)
@@ -122,12 +149,15 @@ class ProviderManager
         break
     @subscriptions?.remove(provider) if provider.dispose?
 
-  registerProvider: (provider, apiVersion='2.0.0') =>
+  registerProvider: (provider, apiVersion='3.0.0') =>
     return unless provider?
 
-    apiIs20 = semver.satisfies(apiVersion, '>=2.0.0')
+    provider[API_VERSION] = apiVersion
 
-    if apiIs20
+    apiIs2_0 = semver.satisfies(apiVersion, '>=2.0.0')
+    apiIs3_0 = semver.satisfies(apiVersion, '>=3.0.0')
+
+    if apiIs2_0
       if provider.id? and provider isnt @defaultProvider
         grim ?= require 'grim'
         grim.deprecate """
@@ -149,9 +179,25 @@ class ProviderManager
         grim.deprecate """
           Autocomplete provider '#{provider.constructor.name}(#{provider.id})'
           contains a `blacklist` property.
-          `blacklist` has been renamed to `disableForSelector`.
+          `blacklist` has been renamed to `disableForScopeSelector`.
           See https://github.com/atom/autocomplete-plus/wiki/Provider-API
         """
+
+    if apiIs3_0
+      if provider.selector?
+        throw new Error("""
+          Autocomplete provider '#{provider.constructor.name}(#{provider.id})'
+          specifies `selector` instead of the `scopeSelector` attribute.
+          See https://github.com/atom/autocomplete-plus/wiki/Provider-API.
+        """)
+
+      if provider.disableForSelector?
+        throw new Error("""
+          Autocomplete provider '#{provider.constructor.name}(#{provider.id})'
+          specifies `disableForSelector` instead of the `disableForScopeSelector`
+          attribute.
+          See https://github.com/atom/autocomplete-plus/wiki/Provider-API.
+        """)
 
     unless @isValidProvider(provider, apiVersion)
       console.warn "Provider #{provider.constructor.name} is not valid", provider

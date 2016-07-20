@@ -1,4 +1,4 @@
-{CompositeDisposable} = require 'atom'
+{Disposable, CompositeDisposable} = require 'atom'
 SnippetParser = require './snippet-parser'
 {isString} = require('./type-helpers')
 fuzzaldrinPlus = require 'fuzzaldrin-plus'
@@ -57,7 +57,7 @@ class SuggestionListElement extends HTMLElement
     @itemsChanged()
 
   detachedCallback: ->
-    @removeActiveClassFromEditor()
+    @activeClassDisposable?.dispose()
 
   initialize: (@model) ->
     return unless model?
@@ -69,6 +69,7 @@ class SuggestionListElement extends HTMLElement
     @subscriptions.add @model.onDidSelectTop(@moveSelectionToTop.bind(this))
     @subscriptions.add @model.onDidSelectBottom(@moveSelectionToBottom.bind(this))
     @subscriptions.add @model.onDidConfirmSelection(@confirmSelection.bind(this))
+    @subscriptions.add @model.onDidconfirmSelectionIfNonDefault(@confirmSelectionIfNonDefault.bind(this))
     @subscriptions.add @model.onDidDispose(@dispose.bind(this))
 
     @subscriptions.add atom.config.observe 'autocomplete-plus.suggestionListFollows', (@suggestionListFollows) =>
@@ -120,18 +121,17 @@ class SuggestionListElement extends HTMLElement
       @returnItemsToPool(0)
 
   render: ->
+    @nonDefaultIndex = false
     @selectedIndex = 0
     atom.views.pollAfterNextUpdate?()
     atom.views.updateDocument @renderItems.bind(this)
     atom.views.readDocument @readUIPropsFromDOM.bind(this)
 
   addActiveClassToEditor: ->
-    editorElement = atom.views.getView(atom.workspace.getActiveTextEditor())
+    editorElement = atom.views.getView(@model?.activeEditor)
     editorElement?.classList?.add 'autocomplete-active'
-
-  removeActiveClassFromEditor: ->
-    editorElement = atom.views.getView(atom.workspace.getActiveTextEditor())
-    editorElement?.classList?.remove 'autocomplete-active'
+    @activeClassDisposable = new Disposable ->
+      editorElement?.classList?.remove 'autocomplete-active'
 
   moveSelectionUp: ->
     unless @selectedIndex <= 0
@@ -163,6 +163,7 @@ class SuggestionListElement extends HTMLElement
     @setSelectedIndex(newIndex) if @selectedIndex isnt newIndex
 
   setSelectedIndex: (index) ->
+    @nonDefaultIndex = true
     @selectedIndex = index
     atom.views.updateDocument @renderSelectedItem.bind(this)
 
@@ -184,6 +185,16 @@ class SuggestionListElement extends HTMLElement
       @model.confirm(item)
     else
       @model.cancel()
+
+  # Private: Confirms the currently selected item only if it is not the default
+  # item or cancels the view if none has been selected.
+  confirmSelectionIfNonDefault: (event) ->
+    return unless @model.isActive()
+    if @nonDefaultIndex
+      @confirmSelection()
+    else
+      @model.cancel()
+      event.abortKeyBinding()
 
   renderList: ->
     @innerHTML = ListTemplate

@@ -59,7 +59,7 @@ class DocParser
      *
      * @return array
      */
-    public function parse($docblock, array $filters, $itemName)
+    public function parse($docblock, array $filters, $methodName)
     {
         if (empty($filters)) {
             return array();
@@ -108,7 +108,7 @@ class DocParser
 
             $result = array_merge(
                 $result,
-                $this->{$filterMethodMap[$filter]}($docblock, $methodName, $tags)
+                $this->{$filterMethodMap[$filter]}($docblock, $itemName, $tags)
             );
         }
 
@@ -228,6 +228,7 @@ class DocParser
             list($type, $description) = $this->filterTwoParameterTag($tags[static::VAR_TYPE][0]);
         } else {
             $type = null;
+            $description = null;
         }
 
         return array(
@@ -298,7 +299,7 @@ class DocParser
 
         $isReadingSummary = true;
 
-        foreach ($lines as $i => $line) {
+        foreach ($lines as $line) {
             if (preg_match(self::TAG_START_REGEX, $line) === 1) {
                 break; // Found the start of a tag, the summary and description are finished.
             }

@@ -394,7 +394,7 @@ Path to uncrustify config file. i.e. uncrustify.cfg (Supported by Uncrustify)
 
 ####  [Coldfusion](#coldfusion) 
 
-**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -1179,6 +1179,69 @@ Path to uncrustify config file. i.e. uncrustify.cfg (Supported by Uncrustify)
 }
 ```
 
+####  [Crystal](#crystal) 
+
+**Supported Beautifiers**:  [`crystal`](#crystal) 
+
+**Description**:
+
+Options for language Crystal
+
+#####  [Disable Beautifying Language](#disable-beautifying-language) 
+
+**Important**: This option is only configurable from within Atom Beautify's setting panel.
+
+**Type**: `boolean`
+
+**Description**:
+
+Disable Crystal Beautification
+
+**How to Configure**
+
+1. You can open the [Settings View](https://github.com/atom/settings-view) by navigating to
+*Edit > Preferences (Linux)*, *Atom > Preferences (OS X)*, or *File > Preferences (Windows)*.
+2. Go into *Packages* and search for "*Atom Beautify*" package.
+3. Find the option "*Disable Beautifying Language*" and change it to your desired configuration.
+
+#####  [Default Beautifier](#default-beautifier) 
+
+**Important**: This option is only configurable from within Atom Beautify's setting panel.
+
+**Default**: `crystal`
+
+**Type**: `string`
+
+**Enum**:  `crystal` 
+
+**Description**:
+
+Default Beautifier to be used for Crystal
+
+**How to Configure**
+
+1. You can open the [Settings View](https://github.com/atom/settings-view) by navigating to
+*Edit > Preferences (Linux)*, *Atom > Preferences (OS X)*, or *File > Preferences (Windows)*.
+2. Go into *Packages* and search for "*Atom Beautify*" package.
+3. Find the option "*Default Beautifier*" and change it to your desired configuration.
+
+#####  [Beautify On Save](#beautify-on-save) 
+
+**Important**: This option is only configurable from within Atom Beautify's setting panel.
+
+**Type**: `boolean`
+
+**Description**:
+
+Automatically beautify Crystal files on save
+
+**How to Configure**
+
+1. You can open the [Settings View](https://github.com/atom/settings-view) by navigating to
+*Edit > Preferences (Linux)*, *Atom > Preferences (OS X)*, or *File > Preferences (Windows)*.
+2. Go into *Packages* and search for "*Atom Beautify*" package.
+3. Find the option "*Beautify On Save*" and change it to your desired configuration.
+
 ####  [C#](#c-) 
 
 **Supported Beautifiers**:  [`Uncrustify`](#uncrustify) 
@@ -1268,7 +1331,7 @@ Path to uncrustify config file. i.e. uncrustify.cfg (Supported by Uncrustify)
 
 ####  [CSS](#css) 
 
-**Supported Beautifiers**:  [`CSScomb`](#csscomb)  [`CSScomb`](#csscomb)  [`JS Beautify`](#js-beautify)  [`JS Beautify`](#js-beautify)  [`JS Beautify`](#js-beautify)  [`JS Beautify`](#js-beautify)  [`JS Beautify`](#js-beautify)  [`JS Beautify`](#js-beautify)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`CSScomb`](#csscomb)  [`JS Beautify`](#js-beautify)  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -1657,7 +1720,7 @@ Maximum amount of characters per line (0 = disable) (Supported by JS Beautify, P
 
 ####  [CSV](#csv) 
 
-**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -1807,7 +1870,7 @@ Path to uncrustify config file. i.e. uncrustify.cfg (Supported by Uncrustify)
 
 ####  [EJS](#ejs) 
 
-**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -1968,6 +2031,30 @@ Indentation size/length (Supported by Pretty Diff)
 }
 ```
 
+#####  [Indent with tabs](#indent-with-tabs) 
+
+**Namespace**: `js`
+
+**Key**: `indent_with_tabs`
+
+**Type**: `boolean`
+
+**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff) 
+
+**Description**:
+
+Indentation uses tabs, overrides `Indent Size` and `Indent Char` (Supported by Pretty Diff)
+
+**Example `.jsbeautifyrc` Configuration**
+
+```json
+{
+    "js": {
+        "indent_with_tabs": false
+    }
+}
+```
+
 #####  [Preserve newlines](#preserve-newlines) 
 
 **Namespace**: `html`
@@ -2109,7 +2196,7 @@ Automatically beautify Elm files on save
 
 ####  [ERB](#erb) 
 
-**Supported Beautifiers**:  [`HTML Beautifier`](#html-beautifier)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`HTML Beautifier`](#html-beautifier)  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -2628,7 +2715,7 @@ Automatically beautify Go files on save
 
 ####  [Handlebars](#handlebars) 
 
-**Supported Beautifiers**:  [`JS Beautify`](#js-beautify) 
+**Supported Beautifiers**:  [`JS Beautify`](#js-beautify)  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -2659,7 +2746,7 @@ Disable Handlebars Beautification
 
 **Type**: `string`
 
-**Enum**:  `JS Beautify` 
+**Enum**:  `JS Beautify`  `Pretty Diff` 
 
 **Description**:
 
@@ -2781,11 +2868,11 @@ List of tags (defaults to [head,body,/html] that should have an extra newline be
 
 **Type**: `string`
 
-**Supported Beautifiers**:  [`JS Beautify`](#js-beautify) 
+**Supported Beautifiers**:  [`JS Beautify`](#js-beautify)  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
-Indentation character (Supported by JS Beautify)
+Indentation character (Supported by JS Beautify, Pretty Diff)
 
 **Example `.jsbeautifyrc` Configuration**
 
@@ -2859,11 +2946,11 @@ Indent <head> and <body> sections. (Supported by JS Beautify)
 
 **Type**: `integer`
 
-**Supported Beautifiers**:  [`JS Beautify`](#js-beautify) 
+**Supported Beautifiers**:  [`JS Beautify`](#js-beautify)  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
-Indentation size/length (Supported by JS Beautify)
+Indentation size/length (Supported by JS Beautify, Pretty Diff)
 
 **Example `.jsbeautifyrc` Configuration**
 
@@ -2911,11 +2998,11 @@ Number of line-breaks to be preserved in one chunk (Supported by JS Beautify)
 
 **Type**: `boolean`
 
-**Supported Beautifiers**:  [`JS Beautify`](#js-beautify) 
+**Supported Beautifiers**:  [`JS Beautify`](#js-beautify)  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
-Preserve line-breaks (Supported by JS Beautify)
+Preserve line-breaks (Supported by JS Beautify, Pretty Diff)
 
 **Example `.jsbeautifyrc` Configuration**
 
@@ -3055,11 +3142,11 @@ Indent wrapped attributes to after N characters (Supported by JS Beautify)
 
 **Type**: `integer`
 
-**Supported Beautifiers**:  [`JS Beautify`](#js-beautify) 
+**Supported Beautifiers**:  [`JS Beautify`](#js-beautify)  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
-Maximum characters per line (0 disables) (Supported by JS Beautify)
+Maximum characters per line (0 disables) (Supported by JS Beautify, Pretty Diff)
 
 **Example `.jsbeautifyrc` Configuration**
 
@@ -3136,7 +3223,7 @@ Automatically beautify Haskell files on save
 
 ####  [HTML](#html) 
 
-**Supported Beautifiers**:  [`JS Beautify`](#js-beautify)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`JS Beautify`](#js-beautify)  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -3581,7 +3668,7 @@ Maximum characters per line (0 disables) (Supported by JS Beautify, Pretty Diff)
 
 ####  [Jade](#jade) 
 
-**Supported Beautifiers**:  [`Pug Beautify`](#pug-beautify)  [`Pug Beautify`](#pug-beautify) 
+**Supported Beautifiers**:  [`Pug Beautify`](#pug-beautify) 
 
 **Description**:
 
@@ -3783,7 +3870,7 @@ Path to uncrustify config file. i.e. uncrustify.cfg (Supported by Uncrustify)
 
 ####  [JavaScript](#javascript) 
 
-**Supported Beautifiers**:  [`JS Beautify`](#js-beautify)  [`JSCS Fixer`](#jscs-fixer)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`JS Beautify`](#js-beautify)  [`JSCS Fixer`](#jscs-fixer)  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -4052,11 +4139,11 @@ Indentation size/length (Supported by JS Beautify, Pretty Diff)
 
 **Type**: `boolean`
 
-**Supported Beautifiers**:  [`JS Beautify`](#js-beautify) 
+**Supported Beautifiers**:  [`JS Beautify`](#js-beautify)  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
-Indentation uses tabs, overrides `Indent Size` and `Indent Char` (Supported by JS Beautify)
+Indentation uses tabs, overrides `Indent Size` and `Indent Char` (Supported by JS Beautify, Pretty Diff)
 
 **Example `.jsbeautifyrc` Configuration**
 
@@ -4316,7 +4403,7 @@ Wrap lines at next opportunity after N characters (Supported by JS Beautify, Pre
 
 ####  [JSON](#json) 
 
-**Supported Beautifiers**:  [`JS Beautify`](#js-beautify)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`JS Beautify`](#js-beautify)  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -4585,11 +4672,11 @@ Indentation size/length (Supported by JS Beautify, Pretty Diff)
 
 **Type**: `boolean`
 
-**Supported Beautifiers**:  [`JS Beautify`](#js-beautify) 
+**Supported Beautifiers**:  [`JS Beautify`](#js-beautify)  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
-Indentation uses tabs, overrides `Indent Size` and `Indent Char` (Supported by JS Beautify)
+Indentation uses tabs, overrides `Indent Size` and `Indent Char` (Supported by JS Beautify, Pretty Diff)
 
 **Example `.jsbeautifyrc` Configuration**
 
@@ -4849,7 +4936,7 @@ Wrap lines at next opportunity after N characters (Supported by JS Beautify, Pre
 
 ####  [JSX](#jsx) 
 
-**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -5006,6 +5093,30 @@ Indentation size/length (Supported by Pretty Diff)
 {
     "js": {
         "indent_size": 4
+    }
+}
+```
+
+#####  [Indent with tabs](#indent-with-tabs) 
+
+**Namespace**: `js`
+
+**Key**: `indent_with_tabs`
+
+**Type**: `boolean`
+
+**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff) 
+
+**Description**:
+
+Indentation uses tabs, overrides `Indent Size` and `Indent Char` (Supported by Pretty Diff)
+
+**Example `.jsbeautifyrc` Configuration**
+
+```json
+{
+    "js": {
+        "indent_with_tabs": false
     }
 }
 ```
@@ -5330,7 +5441,7 @@ Remove trailing whitespace (Supported by Latex Beautify)
 
 ####  [LESS](#less) 
 
-**Supported Beautifiers**:  [`CSScomb`](#csscomb)  [`CSScomb`](#csscomb)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`CSScomb`](#csscomb)  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -5695,7 +5806,7 @@ Maximum amount of characters per line (0 = disable) (Supported by Pretty Diff)
 
 ####  [Markdown](#markdown) 
 
-**Supported Beautifiers**:  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Remark`](#remark)  [`Tidy Markdown`](#tidy-markdown) 
+**Supported Beautifiers**:  [`Remark`](#remark)  [`Tidy Markdown`](#tidy-markdown) 
 
 **Description**:
 
@@ -6809,6 +6920,69 @@ Path to uncrustify config file. i.e. uncrustify.cfg (Supported by Uncrustify)
 }
 ```
 
+####  [OCaml](#ocaml) 
+
+**Supported Beautifiers**:  [`ocp-indent`](#ocp-indent) 
+
+**Description**:
+
+Options for language OCaml
+
+#####  [Disable Beautifying Language](#disable-beautifying-language) 
+
+**Important**: This option is only configurable from within Atom Beautify's setting panel.
+
+**Type**: `boolean`
+
+**Description**:
+
+Disable OCaml Beautification
+
+**How to Configure**
+
+1. You can open the [Settings View](https://github.com/atom/settings-view) by navigating to
+*Edit > Preferences (Linux)*, *Atom > Preferences (OS X)*, or *File > Preferences (Windows)*.
+2. Go into *Packages* and search for "*Atom Beautify*" package.
+3. Find the option "*Disable Beautifying Language*" and change it to your desired configuration.
+
+#####  [Default Beautifier](#default-beautifier) 
+
+**Important**: This option is only configurable from within Atom Beautify's setting panel.
+
+**Default**: `ocp-indent`
+
+**Type**: `string`
+
+**Enum**:  `ocp-indent` 
+
+**Description**:
+
+Default Beautifier to be used for OCaml
+
+**How to Configure**
+
+1. You can open the [Settings View](https://github.com/atom/settings-view) by navigating to
+*Edit > Preferences (Linux)*, *Atom > Preferences (OS X)*, or *File > Preferences (Windows)*.
+2. Go into *Packages* and search for "*Atom Beautify*" package.
+3. Find the option "*Default Beautifier*" and change it to your desired configuration.
+
+#####  [Beautify On Save](#beautify-on-save) 
+
+**Important**: This option is only configurable from within Atom Beautify's setting panel.
+
+**Type**: `boolean`
+
+**Description**:
+
+Automatically beautify OCaml files on save
+
+**How to Configure**
+
+1. You can open the [Settings View](https://github.com/atom/settings-view) by navigating to
+*Edit > Preferences (Linux)*, *Atom > Preferences (OS X)*, or *File > Preferences (Windows)*.
+2. Go into *Packages* and search for "*Atom Beautify*" package.
+3. Find the option "*Beautify On Save*" and change it to your desired configuration.
+
 ####  [Pawn](#pawn) 
 
 **Supported Beautifiers**:  [`Uncrustify`](#uncrustify) 
@@ -7398,7 +7572,7 @@ sort imports (requires isort installed) (Supported by autopep8)
 
 ####  [Riot.js](#riot.js) 
 
-**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -7565,7 +7739,7 @@ Maximum characters per line (0 disables) (Supported by Pretty Diff)
 
 ####  [Ruby](#ruby) 
 
-**Supported Beautifiers**:  [`Rubocop`](#rubocop)  [`Rubocop`](#rubocop)  [`Ruby Beautify`](#ruby-beautify)  [`Ruby Beautify`](#ruby-beautify) 
+**Supported Beautifiers**:  [`Rubocop`](#rubocop)  [`Ruby Beautify`](#ruby-beautify) 
 
 **Description**:
 
@@ -7793,7 +7967,7 @@ Path to rustfmt program (Supported by rustfmt)
 
 ####  [Sass](#sass) 
 
-**Supported Beautifiers**:  [`CSScomb`](#csscomb)  [`CSScomb`](#csscomb)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`CSScomb`](#csscomb)  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -8158,7 +8332,7 @@ Maximum amount of characters per line (0 = disable) (Supported by Pretty Diff)
 
 ####  [SCSS](#scss) 
 
-**Supported Beautifiers**:  [`CSScomb`](#csscomb)  [`CSScomb`](#csscomb)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`CSScomb`](#csscomb)  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -8523,7 +8697,7 @@ Maximum amount of characters per line (0 = disable) (Supported by Pretty Diff)
 
 ####  [Spacebars](#spacebars) 
 
-**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -8835,7 +9009,7 @@ Change case of keywords (Supported by sqlformat)
 
 ####  [SVG](#svg) 
 
-**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -9002,7 +9176,7 @@ Maximum characters per line (0 disables) (Supported by Pretty Diff)
 
 ####  [Swig](#swig) 
 
-**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -9169,7 +9343,7 @@ Maximum characters per line (0 disables) (Supported by Pretty Diff)
 
 ####  [TSS](#tss) 
 
-**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -9482,7 +9656,7 @@ Maximum amount of characters per line (0 = disable) (Supported by Pretty Diff)
 
 ####  [Twig](#twig) 
 
-**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -9639,6 +9813,30 @@ Indentation size/length (Supported by Pretty Diff)
 {
     "html": {
         "indent_size": 4
+    }
+}
+```
+
+#####  [Indent with tabs](#indent-with-tabs) 
+
+**Namespace**: `js`
+
+**Key**: `indent_with_tabs`
+
+**Type**: `boolean`
+
+**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff) 
+
+**Description**:
+
+Indentation uses tabs, overrides `Indent Size` and `Indent Char` (Supported by Pretty Diff)
+
+**Example `.jsbeautifyrc` Configuration**
+
+```json
+{
+    "js": {
+        "indent_with_tabs": false
     }
 }
 ```
@@ -10341,7 +10539,7 @@ Path to uncrustify config file. i.e. uncrustify.cfg (Supported by Uncrustify)
 
 ####  [Visualforce](#visualforce) 
 
-**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -10508,7 +10706,7 @@ Maximum characters per line (0 disables) (Supported by Pretty Diff)
 
 ####  [XML](#xml) 
 
-**Supported Beautifiers**:  [`JS Beautify`](#js-beautify)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`JS Beautify`](#js-beautify)  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -10953,7 +11151,7 @@ Maximum characters per line (0 disables) (Supported by JS Beautify, Pretty Diff)
 
 ####  [XTemplate](#xtemplate) 
 
-**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff)  [`Pretty Diff`](#pretty-diff) 
+**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
@@ -12252,11 +12450,11 @@ Initial indentation level (Supported by JS Beautify)
 
 **Type**: `boolean`
 
-**Supported Beautifiers**:  [`JS Beautify`](#js-beautify) 
+**Supported Beautifiers**:  [`JS Beautify`](#js-beautify)  [`Pretty Diff`](#pretty-diff) 
 
 **Description**:
 
-Indentation uses tabs, overrides `Indent Size` and `Indent Char` (Supported by JS Beautify)
+Indentation uses tabs, overrides `Indent Size` and `Indent Char` (Supported by JS Beautify, Pretty Diff)
 
 **Example `.jsbeautifyrc` Configuration**
 
@@ -13124,6 +13322,30 @@ If in CSS values leading 0s immediately preceeding a decimal should be removed o
 {
     "css": {
         "no_lead_zero": false
+    }
+}
+```
+
+#####  [Indent with tabs](#indent-with-tabs) 
+
+**Namespace**: `js`
+
+**Key**: `indent_with_tabs`
+
+**Type**: `boolean`
+
+**Supported Beautifiers**:  [`Pretty Diff`](#pretty-diff) 
+
+**Description**:
+
+Indentation uses tabs, overrides `Indent Size` and `Indent Char` (Supported by Pretty Diff)
+
+**Example `.jsbeautifyrc` Configuration**
+
+```json
+{
+    "js": {
+        "indent_with_tabs": false
     }
 }
 ```

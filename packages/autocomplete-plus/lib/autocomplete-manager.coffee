@@ -59,8 +59,8 @@ class AutocompleteManager
 
   setSnippetsManager: (@snippetsManager) ->
 
-  updateCurrentEditor: (currentPaneItem) =>
-    return if not currentPaneItem? or currentPaneItem is @editor
+  updateCurrentEditor: (currentEditor) =>
+    return if not currentEditor? or currentEditor is @editor
 
     @editorSubscriptions?.dispose()
     @editorSubscriptions = null
@@ -71,10 +71,10 @@ class AutocompleteManager
     @buffer = null
     @isCurrentFileBlackListedCache = null
 
-    return unless @paneItemIsValid(currentPaneItem)
+    return unless @editorIsValid(currentEditor)
 
     # Track the new editor, editorView, and buffer
-    @editor = currentPaneItem
+    @editor = currentEditor
     @editorView = atom.views.getView(@editor)
     @buffer = @editor.getBuffer()
 
@@ -105,18 +105,28 @@ class AutocompleteManager
     @editorSubscriptions.add @editor.onDidChangePath =>
       @isCurrentFileBlackListedCache = null
 
-  paneItemIsValid: (paneItem) ->
+  editorIsValid: (editor) ->
     # TODO: remove conditional when `isTextEditor` is shipped.
     if typeof atom.workspace.isTextEditor is "function"
-      atom.workspace.isTextEditor(paneItem)
+      atom.workspace.isTextEditor(editor)
     else
-      return false unless paneItem?
+      return false unless editor?
       # Should we disqualify TextEditors with the Grammar text.plain.null-grammar?
-      paneItem.getText?
+      editor.getText?
 
   handleEvents: =>
-    # Track the current pane item, update current editor
-    @subscriptions.add(atom.workspace.observeActivePaneItem(@updateCurrentEditor))
+    # Observe `TextEditors` in the `TextEditorRegistry` and listen for focus,
+    # or observe active `Pane` items respectively.
+    # TODO: remove conditional when `TextEditorRegistry` is shipped.
+    if atom.textEditors?
+      @subscriptions.add(atom.textEditors.observe (editor) =>
+        view = atom.views.getView(editor)
+        if view is document.activeElement
+          @updateCurrentEditor(editor)
+        view.addEventListener 'focus', (element) =>
+          @updateCurrentEditor(editor))
+    else
+      @subscriptions.add(atom.workspace.observeActivePaneItem(@updateCurrentEditor))
 
     # Watch config values
     @subscriptions.add(atom.config.observe('autosave.enabled', (value) => @autosaveEnabled = value))
@@ -161,7 +171,7 @@ class AutocompleteManager
     @getSuggestionsFromProviders({@editor, bufferPosition, scopeDescriptor, prefix, activatedManually})
 
   getSuggestionsFromProviders: (options) =>
-    providers = @providerManager.providersForScopeDescriptor(options.scopeDescriptor)
+    providers = @providerManager.applicableProviders(options.editor, options.scopeDescriptor)
 
     providerPromises = []
     providers.forEach (provider) =>

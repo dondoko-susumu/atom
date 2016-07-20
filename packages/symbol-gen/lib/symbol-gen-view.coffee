@@ -24,6 +24,9 @@ class SymbolGenView
   # Tear down any state and detach
   destroy: ->
 
+  tagfilePath: ->
+    atom.config.get('symbol-gen.tagFile')
+
   consumeStatusBar: (@statusBar) ->
     element = document.createElement 'div'
     element.classList.add('inline-block')
@@ -38,30 +41,33 @@ class SymbolGenView
 
   check_for_on_save: ->
     return unless @isActive
-    onDidSave =
-      atom.workspace.getActiveTextEditor().onDidSave =>
-        @generate()
-        onDidSave.dispose()
+    editor = atom.workspace.getActiveTextEditor()
+    if (editor)
+      onDidSave =
+        editor.onDidSave =>
+          @generate()
+          onDidSave.dispose()
 
   activate_for_projects: (callback) ->
     projectPaths = atom.project.getPaths()
     shouldActivate = projectPaths.some (projectPath) =>
-      tagsFilePath = path.resolve(projectPath, 'tags')
+      tagsFilePath = path.resolve(projectPath, @tagfilePath())
       try fs.accessSync tagsFilePath; return true
     callback shouldActivate
 
   purge_for_project: (projectPath) ->
     swapFilePath = path.resolve(projectPath, swapFile)
-    tagsFilePath = path.resolve(projectPath, 'tags')
+    tagsFilePath = path.resolve(projectPath, @tagfilePath())
     fs.unlink tagsFilePath, -> # no-op
     fs.unlink swapFilePath, -> # no-op
 
   generate_for_project: (deferred, projectPath) ->
     swapFilePath = path.resolve(projectPath, swapFile)
-    tagsFilePath = path.resolve(projectPath, 'tags')
+    tagsFilePath = path.resolve(projectPath, @tagfilePath())
     command = path.resolve(__dirname, '..', 'vendor', "ctags-#{process.platform}")
     defaultCtagsFile = require.resolve('./.ctags')
-    args = ["--options=#{defaultCtagsFile}", '-R', "-f#{swapFilePath}"]
+    excludes = @get_ctags_excludes(projectPath)
+    args = ["--options=#{defaultCtagsFile}", '-R', "-f#{swapFilePath}"].concat excludes
     ctags = spawn(command, args, {cwd: projectPath})
 
     ctags.stderr.on 'data', (data) -> console.error('symbol-gen:', 'ctag:stderr ' + data)
@@ -70,13 +76,23 @@ class SymbolGenView
         if err then console.warn('symbol-gen:', 'Error swapping file: ', err)
         deferred.resolve()
 
+  get_ctags_excludes: (projectPath) ->
+    ignoredNames = atom.config.get("core.ignoredNames")
+    if atom.config.get("core.excludeVcsIgnoredPaths")
+      ignoredNames = ignoredNames.concat @get_vcs_excludes(projectPath)
+    ignoredNames.map (glob) => "--exclude=#{glob}"
+
+  get_vcs_excludes: (projectPath) ->
+    gitIgnorePath = path.resolve(projectPath, '.gitignore')
+    require('ignored')(gitIgnorePath)
+
   purge: ->
     projectPaths = atom.project.getPaths()
     projectPaths.forEach (path) =>
       @purge_for_project(path)
     @isActive = false
 
-  generate: ->
+  generate: () ->
     if not @isActive
       @isActive = true
       @watch_for_changes()
@@ -93,7 +109,7 @@ class SymbolGenView
     projectPaths.forEach (path) =>
       p = Q.defer()
       @generate_for_project(p, path)
-      promises.push(p)
+      promises.push(p.promise)
 
     Q.all(promises).then =>
       # hide status bar tile

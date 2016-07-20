@@ -14,7 +14,7 @@ class FuzzyProvider
   editor: null
   buffer: null
 
-  selector: '*'
+  scopeSelector: '*'
   inclusionPriority: 0
   suggestionPriority: 0
 
@@ -29,7 +29,7 @@ class FuzzyProvider
     @debouncedBuildWordList()
     @subscriptions.add(atom.workspace.observeActivePaneItem(@debouncedUpdateCurrentEditor))
     builtinProviderBlacklist = atom.config.get('autocomplete-plus.builtinProviderBlacklist')
-    @disableForSelector = builtinProviderBlacklist if builtinProviderBlacklist? and builtinProviderBlacklist.length
+    @disableForScopeSelector = builtinProviderBlacklist if builtinProviderBlacklist? and builtinProviderBlacklist.length
 
   debouncedUpdateCurrentEditor: (currentPaneItem) =>
     clearTimeout(@updateBuildWordListTimeout)

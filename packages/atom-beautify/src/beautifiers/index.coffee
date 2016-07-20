@@ -38,6 +38,7 @@ module.exports = class Beautifiers extends EventEmitter
     'coffee-formatter'
     'coffee-fmt'
     'clang-format'
+    'crystal'
     'dfmt'
     'elm-format'
     'htmlbeautifier'
@@ -48,6 +49,7 @@ module.exports = class Beautifiers extends EventEmitter
     'fortran-beautifier'
     'js-beautify'
     'jscs'
+    'ocp-indent'
     'perltidy'
     'php-cs-fixer'
     'phpcbf'
@@ -302,7 +304,7 @@ module.exports = class Beautifiers extends EventEmitter
               grammar : grammar
               extension : fileExtension
               version : version
-              options : allOptions
+              #options : allOptions
               label : language?.name
               category : version
 

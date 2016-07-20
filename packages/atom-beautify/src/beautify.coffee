@@ -72,114 +72,120 @@ showError = (error) ->
     atom.notifications?.addError(error.message, {
       stack, detail, dismissable : true})
 
-beautify = ({onSave}) ->
+beautify = ({editor, onSave}) ->
+  return new Promise((resolve, reject) ->
 
-  plugin.checkUnsupportedOptions()
+    plugin.checkUnsupportedOptions()
 
-  # Continue beautifying
-  path ?= require("path")
-  forceEntireFile = onSave and atom.config.get("atom-beautify.general.beautifyEntireFileOnSave")
+    # Continue beautifying
+    path ?= require("path")
+    forceEntireFile = onSave and atom.config.get("atom-beautify.general.beautifyEntireFileOnSave")
 
-  # Get the path to the config file
-  # All of the options
-  # Listed in order from default (base) to the one with the highest priority
-  # Left = Default, Right = Will override the left.
-  # Atom Editor
-  #
-  # User's Home path
-  # Project path
-  # Asynchronously and callback-style
-  beautifyCompleted = (text) ->
+    # Get the path to the config file
+    # All of the options
+    # Listed in order from default (base) to the one with the highest priority
+    # Left = Default, Right = Will override the left.
+    # Atom Editor
+    #
+    # User's Home path
+    # Project path
+    # Asynchronously and callback-style
+    beautifyCompleted = (text) ->
 
-    if not text?
-      # Do nothing, is undefined
-      # console.log 'beautifyCompleted'
-    else if text instanceof Error
-      showError(text)
-    else if typeof text is "string"
-      if oldText isnt text
+      if not text?
+        # Do nothing, is undefined
+        # console.log 'beautifyCompleted'
+      else if text instanceof Error
+        showError(text)
+        return reject(text)
+      else if typeof text is "string"
+        if oldText isnt text
 
-        # console.log "Replacing current editor's text with new text"
-        posArray = getCursors(editor)
+          # console.log "Replacing current editor's text with new text"
+          posArray = getCursors(editor)
 
-        # console.log "posArray:
-        origScrollTop = getScrollTop(editor)
+          # console.log "posArray:
+          origScrollTop = getScrollTop(editor)
 
-        # console.log "origScrollTop:
-        if not forceEntireFile and isSelection
-          selectedBufferRange = editor.getSelectedBufferRange()
+          # console.log "origScrollTop:
+          if not forceEntireFile and isSelection
+            selectedBufferRange = editor.getSelectedBufferRange()
 
-          # console.log "selectedBufferRange:
-          editor.setTextInBufferRange selectedBufferRange, text
-        else
+            # console.log "selectedBufferRange:
+            editor.setTextInBufferRange selectedBufferRange, text
+          else
 
-          # console.log "setText"
-          editor.setText text
+            # console.log "setText"
+            editor.setText text
 
-        # console.log "setCursors"
-        setCursors editor, posArray
+          # console.log "setCursors"
+          setCursors editor, posArray
 
-        # console.log "Done setCursors"
-        # Let the scrollTop setting run after all the save related stuff is run,
-        # otherwise setScrollTop is not working, probably because the cursor
-        # addition happens asynchronously
-        setTimeout ( ->
+          # console.log "Done setCursors"
+          # Let the scrollTop setting run after all the save related stuff is run,
+          # otherwise setScrollTop is not working, probably because the cursor
+          # addition happens asynchronously
+          setTimeout ( ->
 
-          # console.log "setScrollTop"
-          setScrollTop editor, origScrollTop
-          return
-        ), 0
+            # console.log "setScrollTop"
+            setScrollTop editor, origScrollTop
+            return resolve(text)
+          ), 0
+      else
+        error = new Error("Unsupported beautification result '#{text}'.")
+        showError(error)
+        return reject(error)
+
+      # else
+      # console.log "Already Beautiful!"
+      return
+
+    # console.log 'Beautify time!'
+    #
+    # Get current editor
+    editor = editor ? atom.workspace.getActiveTextEditor()
+
+
+    # Check if there is an active editor
+    if not editor?
+      return showError( new Error("Active Editor not found. "
+        "Please select a Text Editor first to beautify."))
+    isSelection = !!editor.getSelectedText()
+
+
+    # Get editor path and configurations for paths
+    editedFilePath = editor.getPath()
+
+
+    # Get all options
+    allOptions = beautifier.getOptionsForPath(editedFilePath, editor)
+
+
+    # Get current editor's text
+    text = undefined
+    if not forceEntireFile and isSelection
+      text = editor.getSelectedText()
     else
-      showError( new Error("Unsupported beautification result '#{text}'."))
+      text = editor.getText()
+    oldText = text
 
-    # else
-    # console.log "Already Beautiful!"
+
+    # Get Grammar
+    grammarName = editor.getGrammar().name
+
+
+    # Finally, beautify!
+    try
+      beautifier.beautify(text, allOptions, grammarName, editedFilePath, onSave : onSave)
+      .then(beautifyCompleted)
+      .catch(beautifyCompleted)
+    catch e
+      showError(e)
     return
-
-  # console.log 'Beautify time!'
-  #
-  # Get current editor
-  editor = atom.workspace.getActiveTextEditor()
-
-
-  # Check if there is an active editor
-  if not editor?
-    return showError( new Error("Active Editor not found. "
-      "Please select a Text Editor first to beautify."))
-  isSelection = !!editor.getSelectedText()
-
-
-  # Get editor path and configurations for paths
-  editedFilePath = editor.getPath()
-
-
-  # Get all options
-  allOptions = beautifier.getOptionsForPath(editedFilePath, editor)
-
-
-  # Get current editor's text
-  text = undefined
-  if not forceEntireFile and isSelection
-    text = editor.getSelectedText()
-  else
-    text = editor.getText()
-  oldText = text
-
-
-  # Get Grammar
-  grammarName = editor.getGrammar().name
-
-
-  # Finally, beautify!
-  try
-    beautifier.beautify(text, allOptions, grammarName, editedFilePath, onSave : onSave)
-    .then(beautifyCompleted)
-    .catch(beautifyCompleted)
-  catch e
-    showError(e)
-  return
+  )
 
 beautifyFilePath = (filePath, callback) ->
+  logger.verbose('beautifyFilePath', filePath)
 
   # Show in progress indicate on file's tree-view entry
   $ ?= require("atom-space-pen-views").$
@@ -188,13 +194,16 @@ beautifyFilePath = (filePath, callback) ->
 
   # Cleanup and return callback function
   cb = (err, result) ->
+    logger.verbose('Cleanup beautifyFilePath', err, result)
     $el = $(".icon-file-text[data-path=\"#{filePath}\"]")
     $el.removeClass('beautifying')
     return callback(err, result)
 
   # Get contents of file
   fs ?= require "fs"
+  logger.verbose('readFile', filePath)
   fs.readFile(filePath, (err, data) ->
+    logger.verbose('readFile completed', err, filePath)
     return cb(err) if err
     input = data?.toString()
     grammar = atom.grammars.selectGrammar(filePath, input)
@@ -202,14 +211,18 @@ beautifyFilePath = (filePath, callback) ->
 
     # Get the options
     allOptions = beautifier.getOptionsForPath(filePath)
+    logger.verbose('beautifyFilePath allOptions', allOptions)
 
     # Beautify File
     completionFun = (output) ->
+      logger.verbose('beautifyFilePath completionFun', output)
       if output instanceof Error
         return cb(output, null ) # output == Error
       else if typeof output is "string"
         # do not allow empty string
-        return cb(null, output) if output is ''
+        if output.trim() is ''
+          logger.verbose('beautifyFilePath, output was empty string!')
+          return cb(null, output)
         # save to file
         fs.writeFile(filePath, output, (err) ->
           return cb(err) if err
@@ -218,6 +231,7 @@ beautifyFilePath = (filePath, callback) ->
       else
         return cb( new Error("Unknown beautification result #{output}."), output)
     try
+      logger.verbose('beautify', input, allOptions, grammarName, filePath)
       beautifier.beautify(input, allOptions, grammarName, filePath)
       .then(completionFun)
       .catch(completionFun)
@@ -470,8 +484,13 @@ debug = () ->
 
 handleSaveEvent = ->
   atom.workspace.observeTextEditors (editor) ->
-    buffer = editor.getBuffer()
-    disposable = buffer.onDidSave(({path : filePath}) ->
+    pendingPaths = {}
+    beautifyOnSaveHandler = ({path: filePath}) ->
+      logger.verbose('Should beautify on this save?')
+      if pendingPaths[filePath]
+        logger.verbose("Editor with file path #{filePath} already beautified!")
+        return
+      buffer = editor.getBuffer()
       path ?= require('path')
       # Get Grammar
       grammar = editor.getGrammar().name
@@ -490,23 +509,28 @@ handleSaveEvent = ->
       beautifyOnSave = atom.config.get(key)
       logger.verbose('save editor positions', key, beautifyOnSave)
       if beautifyOnSave
-        posArray = getCursors(editor)
-        origScrollTop = getScrollTop(editor)
-        beautifyFilePath(filePath, ->
+        logger.verbose('Beautifying file', filePath)
+        beautify({editor, onSave: true})
+        .then(() ->
+          logger.verbose('Done beautifying file', filePath)
           if editor.isAlive() is true
-            buffer.reload()
-            logger.verbose('restore editor positions', posArray,origScrollTop)
-            # Let the scrollTop setting run after all the save related stuff is run,
-            # otherwise setScrollTop is not working, probably because the cursor
-            # addition happens asynchronously
-            setTimeout ( ->
-              setCursors(editor, posArray)
-              setScrollTop(editor, origScrollTop)
-              # console.log "setScrollTop"
-              return
-            ), 0
+            logger.verbose('Saving TextEditor...')
+            # Store the filePath to prevent infinite looping
+            # When Whitespace package has option "Ensure Single Trailing Newline" enabled
+            # It will add a newline and keep the file from converging on a beautified form
+            # and saving without emitting onDidSave event, because there were no changes.
+            pendingPaths[filePath] = true
+            editor.save()
+            delete pendingPaths[filePath]
+            logger.verbose('Saved TextEditor.')
         )
-      )
+        .catch((error) ->
+          return showError(error)
+        )
+    disposable = editor.onDidSave(({path : filePath}) ->
+      # TODO: Implement debouncing
+      beautifyOnSaveHandler({path: filePath})
+    )
     plugin.subscriptions.add disposable
 
 getUnsupportedOptions = ->
@@ -522,7 +546,10 @@ getUnsupportedOptions = ->
 plugin.checkUnsupportedOptions = ->
   unsupportedOptions = getUnsupportedOptions()
   if unsupportedOptions.length isnt 0
-    atom.notifications.addWarning("You have unsupported options: #{unsupportedOptions.join(', ')} <br> Please run Atom command 'Atom-Beautify: Migrate Settings'.")
+    atom.notifications.addWarning("Please run Atom command 'Atom-Beautify: Migrate Settings'.", {
+      detail : "You have unsupported options: #{unsupportedOptions.join(', ')}",
+      dismissable : true
+    })
 
 plugin.migrateSettings = ->
   unsupportedOptions = getUnsupportedOptions()
@@ -546,9 +573,9 @@ plugin.migrateSettings = ->
 
     # Move all option values to renamed key
     _.each(rename, ([key, newKey]) ->
-      # console.log('rename', key, newKey)
       # Copy to new key
       val = atom.config.get("atom-beautify.#{key}")
+      # console.log('rename', key, newKey, val)
       atom.config.set("atom-beautify.#{newKey}", val)
       # Delete old key
       atom.config.set("atom-beautify.#{key}", undefined)
