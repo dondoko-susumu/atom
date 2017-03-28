@@ -1,3 +1,744 @@
+# 0.85.1:
+- Fix, SUPER Critical: #175 Moving cursor in `visual-mode` make Atom editor really slow.
+  - vmp's mark is stored as marker and was created limitlessly without destroying previous-marker.
+  - As number of marker increased, editor get really slow.
+  - This is old Bug from original vim-mode, but impact get really significant from v0.58.0.
+    - Since from v0.58.0, to track previousSelection(used for `g v`) `<` and `>` mark is updated on every `visual-mode` movement.
+
+# 0.85.0:
+- Fix: When `stayOnYank` was enabled, `y 0`, `y h` no longer move cursor.
+- Fix: [Cosmetic but important] Fix very small cursor position jump( cosmetic ) when activating vL ( because of gap between px and em? )
+- Fix: Respect `v` operator-modifier for `t`( Till ) motion.
+  - e.g. In text "ab" when cursor is at "a"
+    - Old: `d t b` delete "a"( Good ), `d v t b` delete "a"( Bad ).
+    - New: `d t b` delete "a"( Good ), `d v t b` don't delete "a"( Good ).
+- Improve: Now can select line ending new line char in `visual-mode`.
+  - E.g. Move right by `l` at end of line select new-line.
+- Fix: #699 Lost goalColumn in `visual.blockwise` when move across blank-row.
+  - This is regression in v0.84.0.
+- Fix: #119 When `j`, `k` is used as operator's target, don't apply operation when failed to move.
+  - Now more compatible with pure Vim.
+  - Example:
+    - `d j` from last line do nothing. ( In previous version, delete last line ).
+    - `d k` from first line do nothing. ( In previous version, delete first line ).
+- Improve: `g v` after `vL`( visual-linewise ) to restore characterwise `column`.
+- Fix: `v i p d` then `.` repeat from different cursor position now works correctly
+- Internal:
+  - Overhaul: `CursorStyleManager`, `SelectionWrapper`, `TextObject`, `BlockwiseSelection`
+  - Rename `characterwiseHead` to `propertyHead` in `spec-helper.coffee`
+  - Remove lots of unnecessary `null` guard.
+- Breaking: Remove `All` text-obect, it's alias of `Entire` but not used.
+- Breaking: Remove `Edge` text-object, it's experimentally added in the past, but not maintained and not as useful as I originally thought.
+- Improve: TextObject
+  - Improve: No longer iterate `selectTextObject` over each memberSelection of blockwise selection( blockwiseSelection consists of multiple selection ).
+  - Improve: `Fold` , `Function` text-object now always expand if possible by checking containment against selected buffer range
+  - Improve: `Pair` text-object now always find from cursor position.
+  - Improve: Executing text-object from `vL` mode now works as expected in most of text-object.
+  - Internal: Set wise explicitly in most of text-obect rather than dynamically determine from selection range.
+  - Internal: Auto generate `Inner`, or `A` prefixed classes and `AllowForwarding` suffixed classes( reduced lots of boilerplate code ).
+- Improve: visual-blockwise ( `vB`-mode )
+  - #699 Fix: Now respect goalColumn in `vB` when move across blank row by `j` or `k`.
+    - Regression introduced in v0.84.0.
+  - #704 Rewrite vB-mode related code.
+    - vB selection is normalized before selecting text-object.
+    - So no longer iterate `selectTextObject` over each memberSelection of blockwise selection.
+  - Improve: #438 when vB selection respect `goalColumn`
+    - Original goalColumn is respected as long as selection-head is right-most column.
+
+# 0.84.1:
+- Fix: To fix vim-mode-plus-move-selected-text degradation.
+
+# 0.84.0:
+- Fix, Improve: #689 Occurrence was not worked for the word which include non-word char such as `$` and `@`.
+  - E.g. `$var` in Perl, PHP.
+  - This was because when finding occurrences, it searched by `\bword\b` pattern.
+  - But `\b\$var\b` never match `$var`, in this case find by `\$var\b` pattern from this release( auto relax `\b` boundary ).
+- Improve: Preserve fold on `g v`
+- Internal:
+  - Cleanup selection-wrapper code.
+  - Remove unused functions from `utils.coffee`
+
+# 0.83.0:
+- Support: set minimum engines to `^1.14.0`
+- Fix: When `o` was executed in `vL` mode, didn't correctly restore column on shift to `vC` or `normal`.
+  - Now correctly restore `characterwise` column after `o` in `linewise` mode.
+- Improve: `g .` correctly restore subword-occurrence-marker
+  - `g .`( `vim-mode-plus:add-preset-occurrence-from-last-occurrence-pattern` ) is command to restore last cleared preset-occurrence.
+  - It is useful when you mistakenly cleared it by `escape` and quickly recover last preset-occurrence marker.
+  - Previously `preset-subword-occurrence` was not correctly restored by `g .`, but now fixed.
+- Improve: Use faster `displayMarkerLayer::clear()` for hlsearch, occurrence-manager, search-model etc.
+- Internal: add `dev` prefix for setting for dev-use.
+- Internal: Remove lots of unused function in `utils.coffee`.
+- Internal: add `vimState::getConfig` to access package settings.
+
+# 0.82.3:
+- Fix: `move-to-previous-subword` stops boundary of white-space unnecessarily( upstream issue auto-fixed)
+  - Spec to accommodating wrong behavior removed.
+- Fix: `B` moves to beginning of file when invoked from begging of line.
+  - Introduced by upstream change in Atom v1.14.0( or v1.14.1?).
+
+# 0.82.2:
+- Fix: No longer throw exception when `showHoverSearchCounter` is enabled and editor was closed immediately after hover counter was shown.
+
+# 0.82.1:
+- Fix: `p`, `P` in vB-mode no longer throw exception #672
+  - This bug was introduced in v0.80.0.
+
+# 0.82.0:
+- New: command `move-up-wrap`, `move-down-wrap`, `j`, `k` with line wrap( top-to-bottom/bottom-to-top ).
+  - No keymap by default. intended to use from atom-narrow package(now I'm actively developping).
+
+# 0.81.0:
+- Improve, Breaking: Remove `fallbackTabAndShiftTabInNormalMode`
+  - This was necessary since `tab`, `shift-tab` was mapped to `move-to-next-occurrence` and `move-to-previous-occurrence`.
+  - When `true`, fallback `tab`, `shift-tab` to `editor:indent` or `editor:outdent-selected-rows` when no `occurrence-marker` exist.
+  - But now, these mapping is defined in `has-occurrence` scope, which means `occurrence-marker` exists on editor.
+  - So your `tab`, `shift-tab` is no longer conflict if no `occurrence-marker` exits.
+
+# 0.80.0:
+- Breaking: Disable `I`, `A` special keymap in `has-occurrence` scope.
+  - To avoid surprising user. Now behave as normal `I` amnd `A`.
+  - To insert start/end of each occurrences, use `visual-mode` select then `I` or `A`.
+  - Or set keymap in your `keymap.cson` to restore previous verison's keymap.
+    ```
+    'atom-text-editor.vim-mode-plus.has-occurrence:not(.insert-mode)':
+      'I': 'vim-mode-plus:insert-at-start-of-target'
+      'A': 'vim-mode-plus:insert-at-end-of-target'
+    ```
+
+- Fix: No longer throw exception when specified register has no value(=text) on `p`, `P` operation. #656.
+- Fix: Now `selection` properties cleared on each normal-mode operation finish to avoid hover counter is shown at incorrect position.
+- Developer: Spec helper `ensureMode` no longer mutate passed array itself.
+- Developer: `reload-packages` command now reload depending packages in correct order.
+
+# 0.79.1:
+- Fix: #653 Immediately close search-mini-editor when main editorElement was clicked to avoid stale decorations remains on editor.
+- Fix: Move to next subword no longer throw error in some ending string pattern.
+- Improve: `move-to-next-word` and it's child motion now skip white-space only row(compatible with pure-Vim).
+
+# 0.79.0:
+- Fix: #647 Ensure clearing blockwise selection after `.` repeating blockwise operation.
+- Fix: #537 When `persistent-selection` is exists, `I` in `visual-blockwise`, make selected range get wired.
+- Fix: In atom 1.14-beta, when `IncrementalSearch` was enabled, `/` throw exception #652
+- Improve: #646 Improve `TagFinder` to find enclosed range first
+- Internal: Extract normalization/denormalization of `linewise`, `characterwise` selection to selection-wrapper
+- Internal: Improve spec helper
+  - Introduce cursorScreen for spec-helper for explicitness
+  - Now `cursor:` is bufferPosition-wise
+  - #650 `textC` no longer ensure order of cursors appear
+
+# 0.78.0: Happy New Year 2017!
+- New: TransformString Operator `sort-case-insensitively` by @thancock20 #640
+- Fix: `v *` then `n` or `N` in different editor no longer throw error #641.
+- Improve: Pair text-object
+  - Internal: Use new `PairFinder` class to find pair range(extracted from `text-object.coffee`).
+  - Improve: Bracket TextObject: `(, )`, `{, }`, `[, ]`, `<, >`
+    - Find range by considering syntax-scope. #644.
+  - Improve: Quote TextObject: `'`, `"` etc..
+    - Simply find quote if cursor is NOT in quote char #173, #638
+    - If cursor is ON quote char consider inside/outside of double-quote #556, #642
+- Improve: Fold text-object(`i z`, `a z`) no longer ignore fold on cursor's row. #636
+- Internal: New `Base::scanForward`, `Base::scanBackward` and use it
+- Internal: Lots of internal code cleanup(`utils.coffee`, `text-object.coffee` etc.)
+
+# 0.77.0
+- New: Subword support #634
+  - Motion: `move-to-next-subword`, `move-to-previous-subword`, `move-to-end-of-subword`'
+  - TextObject: `a-subword`, `inner-subword`(no keymaps by default)
+  - OperatorModifier: `O` works as like `o`, except `O` works for subword.(e.g. `c O p`)
+  - `g O`(`toggle-preset-subword-occurrence`) mark subword, subword-version of `g o`.
+- New: TransformString family operator `split-string-with-keeping-splitter`, `sort-by-number`( no keymap )
+- New `g q`(`auto-flow`) operator, `g q q` or `g q g q` works for current line #187
+  - Implementation-wise, it just dispatch to core autoflow package. So might not be compatible with pure-Vim.
+- Improve: `maximize-pane` #633
+  - Tweak: Now set `left-margin`(`20%`) when maximized, so that code comes front of your eye.
+  - Now hide statusbar.
+  - New: option `hideStatusBarOnMaximizePane`(default `true`).
+- Tweak: Support #627 earlySelect for operator `replace`
+- Improve: Early settle insertion count for insertion operator(`i` `a`) to avoid taking count for motion.
+- Fix: Now `v enter` then `.` repeated correctly create 1 column persistent #630
+- Fix: `ctrl-v enter .` no longer throw error #630
+- Spec: Improve coverage for `TransformString` children(`join` etc..)
+- Internal: Rewrite `ctrl-a`, `ctrl-x`,  `g ctrl-a`, `g ctrl-x`
+  - Breaking: No longer beep when failed.
+
+# 0.76.0
+- Breaking, Cosmetic: Remove `showHoverOnOperate` feature #626
+  - Reason:
+    - This is fancy feature added at very early phase of vim-mode-plus as experiment.
+    - But this feature getting in a way to improve, cleanup vim-mode-plus.
+  - Removed Configuration: Following parameters are removed, remove it manually from `config.cson` if necessary.
+    - `showHoverOnOperate`
+    - `showHoverOnOperateIcon`
+- New: [Experimental] `surround` now **select** target immediately then get user input.
+  - Better UI feedback, to reduce `what-I-have-to-do-next`, `where-am-I` situation in complex keystroke operation.
+  - When `change-surround` fail at first character, it immediately stop execution( No need to input useless next char ).
+- Fix: `maximize-pane` now work for many many split pane #623.
+- Improve: Hover performance is greatly improved #625
+  - Hover shown in `1 0 j`, `" a y y`, `change-surround` is now responsive than before.
+  - HoverElement is renamed to HoverManager(no longer HTMLELement).
+- Improve: `undo`/`redo` flashing humanization further.
+- Improve: Tweak search flashing to win over existing `highlight-search`.
+- Internal: Cleanup occurrence-spec, avoid using `editor.element` for mini-editor.
+
+# 0.75.0
+- New: `setCursorToStartOfChangeOnUndoRedoStrategy`(default `smart`) #620, #621
+- New: `remove-leading-white-spaces`( no defautl keymap ): work always `linewise`.
+- New, Breaking: `replace` is now normal operator which enter `operator-pending-mode`, old `replace` command was renamed.
+  - OldName: `vim-mode-plus:replace`( mapped from `r` )
+  - NewName: `vim-mode-plus:replace-character`( mapped from `r` )
+- Fix: `m` command was inappropriately repeatable by `.`
+- Fix: No longer throw exception for `V tab` or `V shift-tab` #619
+- Improve: Respect operator specific `stayOn` option when `stayOnOccurrence` was `true` and fail to select `occurrence-marker`.
+- Improve: `d o p` moves cursor to end of mutation as normal `d` #611
+- Improve: `undo/redo`
+  - Cursor placement on `undo`/`redo` further.
+    - `o` and `O` undo/redo is now behave same as pure-Vim.
+  - Flashing is further suppressed to be un-noisy. Also humanize new line(`\n`) change flash to feel naturally.
+    - Skip flash for leading white spaces change
+    - Skip flash when multiple range start and end with exactly same column(e.g. `toggle-line-comments`).
+- Improve: `transform-smart-word-by-select-list` now respect precomposed target of each string transformer.
+  - E.g. `SplitString` have precomposed target( = `MoveToRelativeLine` ), respect it over `smart-word` target.
+- Internal: Remove manual checkpoint and change grouping management from normal operator as like before(was not necessary).
+
+# 0.74.0
+- Improve: More accurate cursor placement after undo/redo. #603
+  - IMPORTANT, new approach to restore cursor position after undo/redo.
+    - Previous release: Did manual-cursor-position-adjustment after undo/redo
+    - From this release: Create text-buffer's checkpoint at correct timing then restore on undo/redo.
+    - Checkpoint mechanism was being used for long time for `i`, `a`, `c`, from this release used operator globally.
+    - This shift is not completed, will continue gradual improvement.
+- Improve: Use different color on `flashOnUndoRedo` #610
+  - Single change: subtle color flash with duration `0.3s`(singe delete-only change is no longer flashed).
+  - Multi change add: green flash with duration `0.8s`
+  - Multi change delete: red flash with duration `0.8s`
+- Improve: `p`, `P` #615
+  - Improve: Flash color differentiation on `p`, `P`(use longer flash to make it obvious mutation boundary).
+  - Breaking: Simplified linewise paste, when line have no ending newline, it add newline automatically
+  - Improve: Pasting characterwise register now place cursor at start of pasted text if text was not single-line-text.
+- Improve: Now Indent(`>`), Outdent(`<`) indent/outdent count times in `visual-mode` #614
+- Improve, Breaking: Improve `insert-at-start/end-of-smart-word`, now no longer stop at whitespace boundary. #613
+  - Breaking: Renamed command name(as same as previous release, no default-keymap)
+    - `insert-at-start-of-inner-smart-word` -> `insert-at-start-of-smart-word`
+    - `insert-at-end-of-inner-smart-word` -> `insert-at-end-of-smart-word`
+- FIX: Incorrectly used `occurrence-flash` if `occurrence-marker` exists but not selected by operation.
+- Breaking: Remove experimental `put-after-and-select`, `put-before-and-select` command #612
+- Internal: When fail to select occurrence `did-select-occurrence` event no longer fired(was fired in previous release).
+- Internal: Rename register type name from `character` to `characterwise` for consistency.
+
+# 0.73.2:
+- Fix: `C` and `D` in `vB`(visual-block) mode was broken from v0.70.0. #602.
+- Fix: `d o tab` then `.` repeat no longer fail #598
+- Improve: Simplify flash for undo/redo, red color is used for remove-only-change #601
+
+# 0.73.1:
+- Improve, New: fallback for `tab`, `shift-tab` in `normal-mode`.
+  - By default in `normal-mode`, `tab` and `shift-tab` is mapped to `move-to-occurrence` and `move-to-previous-occurrence`
+  - When no occurrence-marker was exists on editor, it fallbacks to Atom's default `editor:indent`, `editor:outdent-selected-rows`.
+  - For user don't want this fallback, set `fallbackTabAndShiftTabInNormalMode` to `false`(default `true`).
+
+# 0.73.0:
+- New: Close empty search-mini-editor by `backspace` from @gittyupagain. #567
+- New, Breaking: Keep `occurrence-marker` after operation. #572
+  - Improve: Destroy `occurrence-marker` remains after invalidated.
+  - Breaking: Operate on normal-target when fail to select `occurrence-marker`. #578, #579
+  - Improve: Destroy `occurrence-marker` in-sync if possible #592
+- New: [experimental] Operator `add-blank-line-below`, `add-blank-line-above`, No defaut keymap. #574
+- New, Breaking: `I`, `A` keymap in operator-pending(`d I` for `d ^`, `d A` for `d $`).
+- New: Simplify `tab`, `shift-tab`, #581, #594
+  - Keymap, Breaking: Mapped in all mode except `insert-mode`, opinionated decision.
+    - `tab`: `move-to-next-occurrence`
+    - `shift-tab`: `move-to-previous-occurrence`
+  - New: Setting `flashOnMoveToOccurrence`, default `false`.
+  - Improve: Now correctly skips cleared or invalidated(=invisible) `occurrence-marker`. #594
+  - Improve: `.` repeat support for `move-to-occurrence` targeted operation #591
+  - Improve: Spec coverage.
+- Fix: text-objects function now work properly in language-elixir syntax by @dillonkearns. #585
+- Fix: To undo repeat-of-change need `u` twice in v0.72.0.
+- Fix: When `has-occurrence`, `I`, `A` was incorrectly keymapped in `insert-mode`.
+- Fix: Prevent Atom editor freezes by passing BIG count. #560, #596
+  - For Motion(`9999999j`), TextObject: `v9999999ip` and Insert: `9999999i`
+- Improve: Flashing
+  - Use red flash color for delete operation #573
+  - Longer flash for undo/redo(by keyframe tweaking).
+  - Improve: Reduce chance to re-flash immediately split after undo by reducing duration(1sec to 500ms).
+- Improve: Documentation, description
+  - Improve config description
+  - Add FAQ for `charactersToAddSpaceOnSurround`
+  - Mention `vim-mode-plus-keymaps-for-surround` keymap only package in README.md.
+- Internal, Breaking: [experimental] No longer directly call `Motion::select()` from operator #595
+- Internal: Spec improved
+  - `textC` spec DSL which declare cursor position by `|` and `!`(last-cursor)
+  - Rewrite several specs by improving granularity by checking cursor position(was not checked before)
+  - Allow `partialMatchTimeout` options for ensure and keystroke spec helper
+
+# 0.72.0:
+- New: Command `add-preset-occurrence-from-last-occurrence-pattern` default `g .` keymap.
+- New: Command `insert-at-start-of-occurrence`, `insert-at-end-of-occurrence`
+- New: Config parameter `stayOnOccurrence` to specify stayOn behavior on occurrence-operation. #569.
+- New: unused and unnecessary indirection
+- Improve: Efficiency improved for cursorStyleManager. Skip cursor style modification if it can,
+- Improve, Breaking: `AngleBracket` now can work with multi-line #552
+  - TextObject `Tag` is no longer member of `AnyPair`. Since its conflict with `AngleBracket`
+- Improve, Fix: No longer unwanted remaining flash by `flashOnOperate` since now it's invalidate when touched.
+- Improve: Flash color is more stand-out when occurrence-operation #566
+- Improve: For flashing undo/redo, no longer red/green color blended when whichever is contained other #562
+- Improve: Place cursor more accurately for undo/redo when occurrence is involved.
+- Improve: Respect last cursor position when multiple cursor is cleared by `escape` in `normal-mode`. #557, #562
+- Improve: When occurrence is involved in operation, respect original cursor position after operation finished. #557
+- Improve: highlight when highlightSearch changed like on, off, on  
+- Fix: `toggle-preset-occurrence` should not accept persistentSelection but it was in previous release.
+- Fix: highlightSearch no longer extend highlight marker on appending text on tail #555
+- Internal: All vimState instances are managed by VimState class itself.
+- Internal: New convention. Ensure `ActivateInsertMode` and it's child call `@selectTarget()` before starting any mutation.
+
+# 0.71.0:
+- New: `moveToFirstCharacterOnVerticalMotion` options #550, #549
+  - Default: `true`, if you disable, column position is kept after these motion.
+  - Similar to `startofline` option in pure-Vim.
+  - Affects following motion(Unlike pure-Vim, `d`, `< <`, `> >` is not affected)
+    - `G`, `g g`, `H`, `M`, `L`, `ctrl-f`, `ctrl-b`, `ctrl-d`, `ctrl-u`
+  - For `d`, `< <`, `> >`, use `stayOnXXX` option if you want to keep column.
+- Improve: Don't close search mini-editor on `blur` event. (e.g. app-switch by cmd-tab) #539
+- Internal: `Base::getCount()` can take offset.
+- Internal Bug: Now properly detect duplicate class Name among operations.
+- Internal: Rename `Misc.Scroll` to `ScrollWithoutChangingCursorPosition` for explicitness.
+
+# 0.70.0:
+- New: Option `automaticallyEscapeInsertModeOnActivePaneItemChange`  #535
+- New: Option `keepColumnOnSelectTextObject` to keep original column in `v i p` etc. #541, #543
+- Fix: Cursor no longer become out-of-screen when move upward in `vB` #546
+- Fix: `I` and `A` should work on occurrence when has-occurrence #488, #518
+- Fix: select-occurrence in `vL` does not correctly select occurrence(spec missed to catch) in previous release.
+- Improve: flash-UI feedback when `Y` in `vC` mode.
+- Improve: Cleanup and suppress flash for `r` command
+- Improve: As general rule selection target can override pre-composed target #531
+  - e.g `transform-smart-word-by-select-list` works on selection if selection was not empty.
+- Improve: Persistent-selection treated as-if real-selection further #532, #534
+- Improve: Tweak what syntax scope is treated as function for TextObject.Function
+- Improve: `delete-line` is now available in all mode(visual mode only for default keymap)
+- Improve: Now pair text-object change mode to `vC` regardless of current mode. #542
+  - Remove internally used `TextObject::allowSubmodeChange` property
+- Breaking: Remove experimental but un-used operators and text-objects.
+  - Operator `DeleteOccurrenceInAFunctionOrInnerParagraph`, `ChangeOccurrenceInAFunctionOrInnerParagraph`, `ChangeOccurrenceInAPersistentSelection`
+  - TextObject `UnionTextObject`, `AFunctionOrInnerParagraph`, `ACurrentSelectionAndAPersistentSelection`, `TextObjectFirstFound`
+- Internal: Rename useMakerForStay to stayByMarker and no longer track marker unless needStay()
+- Internal: Cleanup mutationManger #530
+- Internal, Spec: New `textC` set/ensure option, validate exclusive option. #528, #533
+
+# 0.69.0:
+- New: Command `equalize-panes`(`ctrl-w =`) by @mattaschmann
+- New, Breaking: `g I` support, breaking because old `I` mapped command was renamed(harmless for most users).
+  - Renamed because of naming-bug.
+  - Renamed old `insert-at-beginning-of-line` to `insert-at-first-character-of-line`(mapped to `I`).
+  - Then now `insert-at-beginning-of-line` is mapped to `g I`.
+- New: vim-niceblock compatible behavior #488
+  - Now visual-mode's `I`, `A` works differently depending on `vC`, `vB`, `vL` modes.
+  - See `YouDontKnowVimModePlus` page on vmp's wiki for detail.
+- New: [experimental] `search-occurrence` motion. #519
+  - When you can see dotted-underlined-occurrence-marker, `tab`, `shift-tab` can be used as motion.
+  - You can use `space` to deselect occurrence-marker while moving next/prev of `occurrence-marker`.
+  - [keymap]
+    - `tab`: `vim-mode-plus:search-occurrence`
+    - `shift-tab`: `vim-mode-plus:search-occurrence-backwards`
+- Fix: When yank into named register for input-taking-motion(e.g `" a y f )`), it fail to save to register. #520
+- Improve: now `vimState.globalState` is resettable for all or specific field
+- Dev: `open-in-vim` now open buffer with at same cursor position.
+- Fix: Improve: `y i p` now move to start of paragraph after operator finished. #507
+- Fix: Improve: Further compatible resulting cursor position after operator finished. #529
+- Fix: Hover used to show count and register was not correctly positioned, really was bad degradation. #406
+- Improve: No longer share inputUI across operation, as a result `vimState.input` become unavailable. #525.
+- New: `C` in `vC` mode change whole-line #527
+
+# 0.68.0:
+- New: `project-find-from-search` command which have being provided as separate package #508.
+  - `cmd-enter` is default keymap for macOS user.
+- Fix: when `flashScreenOnSearchHasNoMatch` was `false`, throw error when search item was not found #510.
+
+# 0.67.0:
+- Support: set minimum engines to `^1.13.0-beta1`.
+- Fix: Remove use of `::shadow`. #485
+- Fix: `cmd-d` didn't start `visual-mode` suffered by the side-effect of shadowDOM removal #490
+- Experimental, Improve: Better flashing effect using keyframe CSS animation
+  - Breaking: Removed flashing duration config params.
+  - Now flashingDuration is fixed to 1 sec at maximum(duration until marker be destroyed)
+  - User can tweak by css within this duration. Refer `styles/vim-mode-plus.less` if you want.
+- Fix: Scroll motion failed to put cursor at firstChar of screen line when it’s wrapped.
+- Breaking: Remove cursor line flashing effect on smoothScrolling. #502
+- UI: Modify style of search match to modern(??) style.
+- Fix: No longer remove non-vmp-css-class from editorElement temporarily while waiting-user-input #497.
+
+# 0.66.1:
+- Fix: Flash only one instance at a given moment when search `/`, `?`, `#`, `?`. #494
+- Fix: % motion now work again #493 by @mattaschmann
+- Fix When both operation and target take user input, it didn't work correctly. #491
+
+# 0.66.0:
+- New: Following motion commands by @bronson.
+  - `move-to-previous-end-of-word`(`g e`)
+  - `move-to-previous-end-of-whole-word`(`g E`)
+- New: Sugar command `set-register-name-to-*` to use system-clipboard. #272
+- Breaking: Rename `set-register-name-to-blackhole` to `set-register-name-to-_` #478, #473, #482
+- Breaking: `move-up-to-edge` and `move-down-to-edge` no longer move to first-line and last-line if it's not stoppable.
+  - This means, eliminated special handling for first-line and last-line. Just behave same as other line. #481
+- Doc: Fix typo and grammar for README.md by @jimt #483.
+
+# 0.65.0:
+- Improve: Incremental-search `/ enter` and `? enter`(confirm with blank imput) repeat last-search #474, #464
+- New: Update backtick(`` ` ``) and `'` mark on jump-motion #476, #384
+  - So keystroke `` ` ` `` and `' '` jump back to previous position.
+- New: Support `'` mark.
+- New: `set-register-name-to-blackhole` command(no default keymap) to make blackhole-register(`_`) easy-to-use #478, #473
+
+# 0.64.0:
+- Fix: cursor-style-manager no longer throw error when executing `find-and-replace:select-next` in wholeline selection. #406
+- Fix: No longer destroy first cursor after incremental-search is executeded with multi-cursors #461
+- Fix: In visual-blockwise, unnecessary add selection in bottom direction when bottom selection start at column 0 #454
+- Fix: `e`(`move-to-end-of-word`) on blank row at the end of file freezes Atom #469
+
+# 0.63.0:
+- New: Config option `statusBarModeStringStyle`(default `short`) #451
+- New, Improve: Repeate(`.`) command now can repeat `insert-mode`'s delete/backspace operation #322
+
+# 0.62.0:
+- Improve: Improve performance for `f`, `F`, `t`, `T`, Surround #448, #435.
+
+# 0.61.0:
+- Doc: Simplify README.md
+- New: Sentence motion by @bronson
+  - `move-to-next-sentence`: default keymap `)`
+  - `move-to-previous-sentence`: default keymap `(`
+  - `move-to-next-sentence-skip-blank-row`: no default keymap
+  - `move-to-previous-sentence-skip-blank-row`: no default keymap
+- New: tab to space, space to tab conversion operator by @zhaocai #432, #433
+  - `convert-to-soft-tab`: no default keymap
+  - `convert-to-hard-tab`: no default keymap
+- Improve: No longer actually select to display target range for `change-surround-any-pair`, so cursor position is not changed when canceled.
+- Breaking, Improve: Use shorter, minimum length mode indcator string on status-bar #428.
+- Improve: More pure-vim-like behavior for `#` and `#`.
+- Improve: Cleanup search motion(`/`, `?`). #440.
+- Breaking: Remove experimental motion and operator which was intended to replacement of `f`, `F` but was not such useful.
+  - `SearchCurrentLine`
+  - `SearchCurrentLineBackwards`
+  - `InsertAtStartOfSearchCurrentLine`
+  - `InsertAtEndOfSearchCurrentLine`
+- Fix: Don't pass empty array to `editor.setSelectedBufferRanges`, and collectly restore cursor when occurrence opeation was failed on `.` repeat.
+
+# 0.60.1:
+- Fix: `;`, `,` throw error if orignal-find-command-executed-editor was destoyed. #434
+
+# 0.60.0:
+- Improve: Fix minor inconsistency for amount of rows to scroll between normal and visual for `ctrl-f, b, d, u`.
+- New: Smooth scroll for `ctrl-f, b, d, u`. Disabled by default. New config option to enable and tweak animation duration.
+- New, Experimental: TextObject `a-edge` and `inner-edge`(no diff for now), which select from up-edge to down-edge. No keymap by default.
+
+# 0.59.0:
+- Breaking: `j`, `k` now always works as bufferRow-wise(screenRow-wise in previous version).
+  - Previous `j`, `k` behavior is available as `g k`, `g j` as like pure Vim.
+- New: Operator `InsertAtStartOfInnerSmartWord`, `InsertAtEndOfInnerSmartWord` no keymap by default #424
+- Fix: `p`, `P` mutation tracked again(was not tracked by degradation) to `select-latest-changes` #426
+- Fix: `f` repeat by `;`, `,` clear existing selection where it should extend selection #425
+- Improve: `g n` and `g N` works more pure-vim-like.
+- Internal: Cleanup cursor position normalization required in `visual-mode`.
+
+# 0.58.5:
+- Improve: `delete-surround`, `change-surround` no longer trim spaces when open-pair-char and close-pair-char was same(e.g `'text'`, `"text"`).
+
+# 0.58.4:
+- Fix, Degradation: Again guard in case mutation information was unavailable when tracking changes.
+
+# 0.58.3:
+- Internal, Improve: `,` and `;` is no longer instance of operator to avoid complexity.
+- Fix: Throwing error in `V D` keystroke. #416, #417.
+
+# 0.58.2:
+- Fix: Guard in case mutation information was unavailable when tracking changes.
+
+# 0.58.1:
+- Improve: Clear multiple-selection when `create-persistent-selection` #414
+- Keymap: Remove `cmd-d` in `has-persistent-selection` scope to work well with default `cmd-d` #413
+- Keymap: Add `[`, `]` to `vim-mode-plus:move-up-to-edge`, `vim-mode-plus:move-down-to-edge` #412
+
+# 0.58.0:
+- New: `preset-occurrence` #395, #396
+  - Allow user to set occurrence BEFORE operator.
+  - Keymap: In `normal`, `visual`, `g o` to `toggle-preset-occurrence`.
+    - It add/remove `preset-occurrence` at cursor position.
+    - When removing, it remove one by one, not all.
+  - Keymap: In incsearch input, `cmd-o` to `add-occurrence-pattern-from-search`
+    - It add `preset-occurrence` by search-pattern.
+  - Following two operation do the same thing, but former is `operator-modifier`, later is `preset-occurrence`(`g o`).
+    - `c o $`: change cursor-word till end-of-line.
+    - `g o c $`: change cursor-word till end-of-line.
+- New: PersistentSelection: (former RangeMarker)
+  - Allow user to set target BEFORE operator.
+  - Used as implicit target of operator. As like selection in `visual-mode` is used as implicit target.
+  - Config: `autoSelectPersistentSelectionOnOperate`(default=true) control to disable implicit targeting.
+  - Updated style to seem like selection.
+  - Keymap: In `visual`, `enter` to `create-persistent-selection`.
+  - If you map `c s` to `change-surround`, I recommend you to disable it including other keymap starting with `c`.
+  - Following two operation do the same thing, but former target is normal selection, later target is `persistent-selection`.
+    - `V j j c`: change two three line.
+    - `V j j enter c`: change three line.
+  - Common use case is
+    - Work on multiple target without using mouse: set multiple target by `persistent-selection` then mutate.
+    - Narrow target range to include particular set of `occurrence`.
+- New: Highlight occurrence when occurrence modifier(`o`) is typed. #377
+- API Breaking, Improve: globalState is no longer simple object, use `get`, `set` method instead. Now observable it's change.
+- Breaking, Improve: When `H`, and `L` motion is used as target of operator, ignore scrolloff to mutate till visible-top or bottom row.
+- Breaking: `clearMultipleCursorsOnEscapeInsertMode` is now default `false`, this was changed in v0.57.0, but now reverted. #376
+- Fix: PreviousSelection(`g v`) was incorrectly shared across editor.
+- Fix: No longer use `@syntax-result-marker-color` instead use `@syntax-text-color`.
+- Improve: Gradual clearing different kind of marker(persistent-selection, occur, hlsearch).
+- Improve, Fix: `stayOnDelete` is now work properly on every situation.
+- Improve: Use marker to track original cursor position to stay. #380
+- Improve: When `stayOnOperate` family feature are enabled, adjust cursor position to not exceeds end of mutation #380
+- Improve: Crean up OperationStack. #400
+- Improve: Many TextObject now follow new convention(return range of text-object by `getRange()`).
+- Improve: `word` text-object family to select more vim-like range(don't select adjoining non-word-char like Atom's default `selection.selectWord()`).
+- Internal: Debug codes and cleanup
+- Internal: `OperationStack::subscribe` now return subscribed handler.
+- Internal: Split out highlightSearch concerning code as HighlightSearchManager class #398
+- Internal: Split out mutation concerning code in operator as MutationTracker class
+- Internal: Split out rangeMaker concerning code as PersistentSelectionManager class
+- New: VisibleArea text-object. keymap `i v`.
+- New: `UnionTextObject` and `AFunctionOrInnerPair`
+- Rename: Operator `replace` to `replace-and-move-right` and `replace` is general replace operator.
+
+# 0.57.0:
+- Fix: `a-word` and `a-whole-word` now select leading white-space when trailing space was not exist #355
+- Fix: Paste(`p`) non-linewise text to empty line now insert text to same line, not next-line like previous version. #359.
+- New: When `o` modifier is used in `operator-pending-mode`, `with-occurrence` css scope is set to provide keymap scope.
+- New: Now `Operator Pending` status is shown on status-bar.
+- Internal, Improve: `Operator.coffee` is split out into three files and overhauled greatly #370.
+- New: Stay preference support for `Delete`, and `StayOnDelete` config options control this behavior.
+- Breaking: Removed `SetCursorsToStartOfTarget`, `SetCursorsToStartOfRangeMarker` since not used.
+- Improve: `.` repeat is no longer depend `Repeat` wrapper operation. Simply replayed recorded operation by operationStack.
+- Breaking, New: `clearMultipleCursorsOnEscapeInsertMode` config option with `true` by default.
+- Breaking, Experimental, New: Default keymap only available in `o` modifier is specified. #379
+  - To change occur in `inner-paragraph`: Can type `c o p`, instead of `c o i p`
+  - To change occur in `a-function`: Can type `c o f`, instead of `c o a f`
+  - To change occur in `a-range-marker`: Can type `c o r`, instead of `c o a r`
+  - To change occur in `inner-current-line`: Can type `c o l`, instead of `c o i l`
+  - To change occur in `a-fold`: Can type `c o z`, instead of `c o a z`
+  - Off course: you can do with operator other than `c`. e.g. `d o f`, `g U o z`.
+- Breaking, Degradation, Improve: To fix stale selection properties, I disabled special support for outer-vmp command which create selection.
+  - When outer-vmp command create selection and enter `visual-mode`, original cursor position is no longer preserved. e.g. `cmd-l`.
+
+# 0.56.0:
+- New: Operator `insert-at-start-of-occurrence`, `insert-at-end-of-occurrence` to start insert at occurrence.
+- New: Operator `sort` #365
+- New: Motion `search-current-line`, `search-current-line-backwards` #366
+- Fix: `f`, `F`, `t`, `T` was broken, no longer focus input on repeat by `;` or `,` #367
+
+# 0.55.0:
+- Internal: Avoid circular referencing for string transformers store.
+- Doc: Update doc-string of many operator for better command report for vmp wiki.
+- Breaking, Improve: `AddSelection` no longer get word from visual-mode #351
+- New: `All` TextObject as alias of `Entire`. #352
+- Improve?, Breaking?: Change range-marker style as-if selection #357
+- Improve, Rename: Cleanup operator-modifier mechanism. Renamed command #357
+  - `v`: `force-operator-characterwise` to `operator-modifier-characterwise`
+  - `V`: `force-operator-linewise` to `operator-modifier-linewise`
+- New: Occurrence operator-modifier #357
+  - `o` in `operator-pending-mode`
+  - As like `v` or `V` modifier force the wise of operator.
+  - `o` modifier re-select cursor-word from target range.
+    - e.g. `g U o i p` upper case all occurrence of cursor-word in paragraph
+    - e.g. `c i p` change whole paragraph, `c o i p` change occurrence of cursor word in paragraph.
+  - This modifier is available for all operator.
+  - `select-occurrence`, `map-surround` is created based on this `occurrence` modifier.
+- New: Narrowed selection state #357
+  - `is-narrow` state is automatically activated/deactivated when `visual-mode` and last selection is multi-line.
+  - Available shortcut in `visual-mode.is-narrow` scope.
+    - `ctrl-cmd-c`: `change-occurrence` to change occurrence of cursor word in selection.
+    - `cmd-d`: `select-occurrence` to select occurrence of cursor word in selection.
+- New: RangeMarker new command.
+  - `toggle-range-marker`: remove or add range-marker
+  - `toggle-range-marker-on-inner-word`: `inner-word` pre-targeted version
+  - `convert-range-marker-to-selection`: add selection on all range-marker and remove range-marker after select.
+- New: IncrementalSearch specific `/`, `?` special feature #357
+  - Direct command from search-input mini editor.
+    - `ctrl-cmd-c`: `change-occurrence-from-search` to change occurrence of search pattern matched.
+    - `cmd-d`: `select-occurrence-from-search` to select occurrence of search pattern matched.
+    - When above command is applied operator target is automatically set in following priority.
+      1. In `visual-mode` use current selection as target.
+      2. If there is `range-marker` then use it as target.
+      3. None of above match, then enter operator-pending state to get target from user.
+- Rename: `add-selection` to `select-occurrence`
+- Improve: `reset-normal-mode` clear hlsearch and range-marker more thoughtfully. No longer clear in following situation.
+  - Internal invocation of `vimState.resetNormalMode()`.
+  - When having multiple cursor.
+- Internal: Define `Base::initialize` to be eliminate uncertainty of super call in child class. #361
+
+# 0.54.1:
+- Breaking: Revert change introduced in 0.54.0(Was not good). insert-mode escape return to normal-mode regardless os autocomplet popup #339.
+
+# 0.54.0:
+- Improve, Breaking: When autocomplete's popup is active, `escape` in `insert-mode` no longer escape insert-mode. #339
+- New: `TrimString` operator 'g |' for default keymap. #341
+- Improve, Breaking: #342 `TransformStringBySelectList` no longer ask target first. Instead ask target last as in normal operator.
+- Internal: Let each operator register itself to select-list
+- New, Experimental: `incrementalSearchVisitDirection` config option #343
+  - Default `absolute`, if `relative`, `visit-next`(tab) follows to search direction(`/` or `?`).
+- Improve: Now user can invoke `add-selection` from `visual` mode #340.
+- New: Add default keymap `g cmd-d` to `vim-mode-plus:add-selection`.
+- Improve, Breaking: Rename `RangeMarker` family operator, text-object to fix naming inconsistency. #346
+  - Operator: `MarkRange` to `CreateRangeMarker`
+  - TextObject: `MarkedRange` to `RangeMarker`
+- Fix: In case vimState is not available(not sure why), cancel execution of operation. #347
+- New: Add keymap to make `I` and `A` is available in all visual submode(was available in `visual-block` only in previous version) #348
+
+# 0.53.0:
+- Fix: Command is dispatched to different(incorrect) editor instead of editor which fired original event. #338
+
+# 0.52.0:
+- Doc: Update links in README.md
+- Improve: Suppress error when motion is pushed to operation stack when previous motion had not finished. #327
+- Internal: Consolidate vmp specific error class. Avoid inappropriate class inheritance.
+- Improve: Prevent unnecessary propagation of event for all vmp commands.
+- Doc: Add ISSUE_TEMPLATE.md.
+- New: `Y` in visual-mode yank whole line #330.
+- Improve, Breaking: `Surround` and `ChangeSurround` trim() white spaces of inner text before surround #331. by @ypresto
+- Improve: `ctrl-f` no longer put cursor to EOF instead of vimEOF.
+- Improve: Accuracy improved for the position where hover shows up, so `ChangeSurroundAnyPair` shows hover on original cursor position.
+- Improve: Notification warning when user enabled both vim-mode and vim-mode-plus #335.
+
+# 0.51.0:
+- New: `groupChangesWhenLeavingInsertMode` setting to control whether bundle changes or not when leaving insert-mode #323.
+When disabled, changes are not bundled and user can undo more granular level(smaller steps). Default is `true`(same as pure Vim).
+- Mention `paner` in helper packages section of README.md since revived!
+
+# 0.50.0:
+- Fix: Deprecation warning introduced by new editor.displayLayer #319.
+- Support: set minimum engines to 1.9.0 above.
+
+# 0.49.1:
+- Fix: Invoking text-object command directly from insert-mode cause uncaught exception #318.
+
+# 0.49.0:
+- Improve, Breaking: #314 Allow `move-up-to-edge` and `move-down-to-edge` stops at first or last row even if it char was blank.
+
+# 0.48.0:
+- Improve: New command `vim-mode-plus:force-operator-characterwise`, `vim-mode-plus:force-operator-linewise` to change original wise(linewise/charactewise) and toggle exclusiveness #313
+
+# 0.47.0:
+- Fix: TextObject a-paragraph did not select trailing blank rows for one-line non-blank paragraph #309
+- Breaking: Simplify TextObject comment. now `a /` and `i /` works identically #311
+
+# 0.46.0:
+- cosmetic change, my preference about parenthesis has changed.
+- Improve: reversing selection by `o` in visual-mode make reversed state sync to lastSelection in multi-selection situation.
+- Fix: `ctrl-f`, `ctrl-b`, `ctrl-d`, `ctrl-u`. Just follow the way of vim-mode's fix. It was better than vmp's.
+- Doc: Make "disable vim-mode first" instruction standout since not small amount of user reporting issue by enabling both!
+
+# 0.45.0:
+- Fix; `.` repeat collectedly replay vB range. #261
+- New: Support `activate-normal-mode-once command` #281 suggested by @wangxiexe
+
+# 0.44.1:
+- Fix: `ctrl-y`, `ctrl-e`, throw error, and not worked properly, latent bug of vmp become obvious from Atom 1.9.0-beta0
+- Improve: Now `3d2w` delete 6(3x2) words instead of 32 words in previous version. #289
+
+# 0.44.0:
+- New: Improve % motion, support HTML Tag, and AngleBracket #285
+- Fix: `Uncaught TypeError: history.getChangesSinceCheckpoint is not a function` #288
+
+# 0.43.0:
+- Fix: Don't throw error when `vr` in empty buffer by avoiding odd state(=visual-mode but selection is empty) #282
+- Improve: Refactoring
+- New: Operator.PascalCase by @raroman, default keymap is `gC`. pascase-case works like `pascal-case to PascalCase`.
+- Improve: `D` in visual-mode should delete whole line #284
+
+# 0.42.0: Big release not for feature, but because default setting change.
+- Change Default: `setCursorToStartOfChangeOnUndoRedo` is now enabled by default.
+- Change Default: `flashOnUndoRedo` is now enabled by default.
+- Cleanup: Remove `pollyFillsToTextBufferHistory` since supported engine is already `>=1.7.0`.
+- Cleanup: Remove workaround for AutoIndent of single "\n" since v1.7.2 Atom-core includes this fix. #231
+- New: CompactSpaces operator(`g space` by default). To compacts multiple space to single space, not touch leading, trailing spaces #279.
+
+# 0.41.0:
+- New: Add service `observeVimStates`, `onDidAddVimState` and `vimState::onDidSetMark` #276
+
+# 0.40.1:
+- Breaking: Rename `split-character` to `split-by-character`.
+- Fix: `ctrl-y`, `ctrl-e`. Just follow original vim-mode fix. #275
+
+# 0.40.0:
+- Improve: Test spec now support more concise keystroke syntax and all spec rewritten to use new keystroke #270
+- New: add experimental `startInInsertModeScopes` configuration to selectively start in `insert-mode` for specified scopes.
+
+# 0.39.0:
+- Improve: Now selectAllInRangeMarker can pick word from visual selection.
+- Improve: selectAllInRangeMarker can switch regex's word boundary option \b based if in visual-mode.
+- New: Motion YankToLastCharacterOfLine for user who don't like default `Y` include newline #265.
+- New: New setting option to suppress highlightSearch for certain scopes
+- Improve: No longer use custom marker property since it's deprecated in v1.9.0 #242
+- Improve: Use display-layer methods #242
+- Improve: Use clipDirection instead of clip for screenPosition clipping #242
+- Fix: `w` now can move to next line in CRLF file #267
+
+# 0.38.0:
+- Improve: #259 `*`, `#` now pick search word under cursor in the same manner where selection.selectWord() pick word.
+- Breaking: #259 Remove hidden `vim-mode-plus.iskeyword` configuration option.
+- Fix: Make `MoveToMark` executable from command-pallate #252, #254.
+- Improve: highlightSearch no longer extend highlight marker even when character inserted at intersecting tail.
+- Improve: #262 Now `maximize-pane` can maximize none-editor paneItem such as setting-view, markdown-preview.
+- Breaking: #262 `maximize-pane` is mapped from `ctrl-w z`(for all) and `cmd-enter`(for mac) by default.
+- New: #262 New config `hideTabBarOnMaximizePane`(enabled by default). Disabling it keep tab-bar when maximized.
+- Fix: #258 `f` command occasionally throw error, so I simply revert to former code which use panel to attach hidden mini-editor.
+
+# 0.37.1:
+- Fix: #258 `f`, `F` fail after paneItem change then back to original paneItem.
+
+# 0.37.0:
+- Fix: #252, #254 No longer use input mini editor for single char input for mark
+- Internal: make command event accessible via vimState while running command
+- Improve: If hide option is set on Input::focus() it don't add Panel
+- Fix: #253 fix `r` in vB
+
+# 0.36.0:
+- Internal: Eliminate view/model separation for Hover and HoverElement.
+- New: `SearchMatchForward`(`gn`), `SearchMatchBackward`(`gN`) text-object. #241
+- Fix: Don't clear maximized state when active item changed in same pane #244
+- New: AddSelection operator #245
+- Dev: add `npm run watch`
+- New: Preserve `<`, `>` mark for visual start and end.
+- New: PreviousSelection text-object vB still not supported #246
+- New: MarkRange operator and MarkedRange text-object #249
+- New: Config option to clear HighlightSearch and RangeMarker on `escape` in normal-mode. #250
+- Improve: Support `InsertAtStartOfSelection` from vC mode, no longer need to enter vB only for insert at start of selection.
+- Breaking: MoveTo(Previous/Next)FoldStart no longer linewise motion.
+- New: General insertion operator `MotionByTarget`
+- New Experimental new Operator `SetCursorsToStartOfTarget` and MarkedRange precomposed version.
+- Internal: Do editorElement className update manually.
+
+# 0.35.1:
+- Fix: Ignore `mouseup` event handling on `insert` mode #240
+
+# 0.35.0:
+- Internal: Gradually making motion into pure point calculator #225
+- Improve: Operate on same range on `.` repeat even if `stayOnTransformString` was enabled #235
+- New: MoveToColumn motion. Default keymap is `|`. #230
+- Improve: `dblclick` correctly activate visual mode, simplify mouse event observer. #228
+- Improve: Better integration with Atom's native commands(e.g `cmd-l`) #239
+
+# 0.34.0:
+- Fix: `gg`, `GG` throw error when destination row was blank line. #233
+- Fix: Critical bug TextBuffer.history pollyfilled multiple times because of incorrect guard #229
+
+# 0.33.0:
+- Support: set minimum engines to 1.7.0 above.
+- Internal: Cleanup blockwise-selection.
+- Internal: Now modeManager::activate take only true mode(no longer handle `reset`, `previous` as former version).
+- Breaking: Rename `activate-previous-visual-mode` to `select-previous-selection`
+- Experiment: Trying to not depend on atom's Selection::selectWord. #225
+- Experiment: Trying being independent from atom's imperative cursor motion. #225
+- Breaking: #224 remove Move(Up|Down)ToNonBlank
+- Fix: Don't move cursor up when inserting single white space at column 0 #226
+- Fix: To support Atom v1.7.0, polyfill for TextBuffer::history.getChangesSinceCheckPoint #229
+- Fix: `cc`, `S` ignore auto indent on Atom v1.7.0 #231
+
 # 0.32.1:
 - Fix: Uncaught error on `y`, `gU` etc.. in `vB` when `stayOnYank`, `stayOnOperator` enabled #221.
 

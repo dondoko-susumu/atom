@@ -11,7 +11,7 @@ describe "Prefixes", ->
       {set, ensure, keystroke} = vim
 
   afterEach ->
-    vimState.activate('reset')
+    vimState.resetNormalMode()
 
   describe "Repeat", ->
     describe "with operations", ->
@@ -19,26 +19,29 @@ describe "Prefixes", ->
         set text: "123456789abc", cursor: [0, 0]
 
       it "repeats N times", ->
-        ensure '3x', text: '456789abc'
+        ensure '3 x', text: '456789abc'
 
       it "repeats NN times", ->
-        ensure '10x', text: 'bc'
+        ensure '1 0 x', text: 'bc'
 
     describe "with motions", ->
       beforeEach ->
         set text: 'one two three', cursor: [0, 0]
 
       it "repeats N times", ->
-        ensure 'd2w', text: 'three'
+        ensure 'd 2 w', text: 'three'
 
     describe "in visual mode", ->
       beforeEach ->
         set text: 'one two three', cursor: [0, 0]
 
       it "repeats movements in visual mode", ->
-        ensure 'v2w', cursor: [0, 9]
+        ensure 'v 2 w', cursor: [0, 9]
 
   describe "Register", ->
+    beforeEach ->
+      vimState.globalState.reset('register')
+
     describe "the a register", ->
       it "saves a value for future reading", ->
         set    register: a: text: 'new content'
@@ -48,6 +51,58 @@ describe "Prefixes", ->
         set    register: a: text: 'content'
         set    register: a: text: 'new content'
         ensure register: a: text: 'new content'
+
+    describe "with yank command", ->
+      beforeEach ->
+        set
+          cursor: [0, 0]
+          text: """
+          aaa bbb ccc
+          """
+      it "save to pre specified register", ->
+        ensure '" a y i w', register: a: text: 'aaa'
+        ensure 'w " b y i w', register: b: text: 'bbb'
+        ensure 'w " c y i w', register: c: text: 'ccc'
+
+      it "work with motion which also require input such as 't'", ->
+        ensure ['" a y t', {input: 'c'}], register: a: text: 'aaa bbb '
+
+    describe "With p command", ->
+      beforeEach ->
+        vimState.globalState.reset('register')
+        set register: a: text: 'new content'
+        set
+          text: """
+          abc
+          def
+          """
+          cursor: [0, 0]
+
+      describe "when specified register have no text", ->
+        it "can paste from a register", ->
+          ensure mode: "normal"
+          ensure ['"', input: 'a', 'p'],
+            text: """
+            anew contentbc
+            def
+            """
+            cursor: [0, 11]
+
+        it "but do nothing for z register", ->
+          ensure ['"', input: 'z', 'p'],
+            text: """
+            abc
+            def
+            """
+            cursor: [0, 0]
+
+      describe "blockwise-mode paste just use register have no text", ->
+        it "paste from a register to each selction", ->
+          ensure ['ctrl-v j "', input: 'a', 'p'],
+            textC: """
+            !new contentbc
+            new contentef
+            """
 
     describe "the B register", ->
       it "saves a value for future reading", ->
@@ -73,7 +128,7 @@ describe "Prefixes", ->
     describe "the * register", ->
       describe "reading", ->
         it "is the same the system clipboard", ->
-          ensure register: '*': text: 'initial clipboard content', type: 'character'
+          ensure register: '*': text: 'initial clipboard content', type: 'characterwise'
 
       describe "writing", ->
         beforeEach ->
@@ -90,7 +145,7 @@ describe "Prefixes", ->
       describe "reading", ->
         it "is the same the system clipboard", ->
           ensure register:
-            '*': text: 'initial clipboard content', type: 'character'
+            '*': text: 'initial clipboard content', type: 'characterwise'
 
       describe "writing", ->
         beforeEach ->
@@ -128,21 +183,21 @@ describe "Prefixes", ->
         set register: 'a': text: 'abc'
         atom.clipboard.write "clip"
         set text: "012\n", cursor: [0, 2]
-        keystroke 'i'
+        ensure 'i', mode: 'insert'
 
       it "inserts contents of the unnamed register with \"", ->
-        ensure [{ctrl: 'r'}, {char: '"'}], text: '013452\n'
+        ensure ['ctrl-r', input: '"'], text: '013452\n'
 
       describe "when useClipboardAsDefaultRegister enabled", ->
         it "inserts contents from clipboard with \"", ->
           settings.set 'useClipboardAsDefaultRegister', true
-          ensure [{ctrl: 'r'}, {char: '"'}], text: '01clip2\n'
+          ensure ['ctrl-r', input: '"'], text: '01clip2\n'
 
       it "inserts contents of the 'a' register", ->
-        ensure [{ctrl: 'r'}, {char: 'a'}], text: '01abc2\n'
+        ensure ['ctrl-r', input: 'a'], text: '01abc2\n'
 
       it "is cancelled with the escape key", ->
-        ensure [{ctrl: 'r'}, {char: 'escape'}],
+        ensure 'ctrl-r escape',
           text: '012\n'
           mode: 'insert'
           cursor: [0, 2]
@@ -168,7 +223,7 @@ describe "Prefixes", ->
           expect(clipboardBySelection.size).toBe(0)
           expect(subscriptionBySelection.size).toBe(0)
 
-          keystroke "yiw"
+          keystroke "y i w"
           ensurePerSelectionRegister('012', 'abc', 'def')
 
           expect(clipboardBySelection.size).toBe(3)
@@ -179,12 +234,12 @@ describe "Prefixes", ->
 
       describe "Yank", ->
         it "save text to per selection register", ->
-          keystroke "yiw"
+          keystroke "y i w"
           ensurePerSelectionRegister('012', 'abc', 'def')
 
       describe "Delete family", ->
         it "d", ->
-          ensure "diw", text: ":\n:\n:\n"
+          ensure "d i w", text: ":\n:\n:\n"
           ensurePerSelectionRegister('012', 'abc', 'def')
         it "x", ->
           ensure "x", text: "02:\nac:\ndf:\n"
@@ -198,14 +253,14 @@ describe "Prefixes", ->
 
       describe "Put family", ->
         it "p paste text from per selection register", ->
-          ensure "yiw$p",
+          ensure "y i w $ p",
             text: """
               012:012
               abc:abc
               def:def\n
               """
         it "P paste text from per selection register", ->
-          ensure "yiw$P",
+          ensure "y i w $ P",
             text: """
               012012:
               abcabc:
@@ -213,11 +268,24 @@ describe "Prefixes", ->
               """
       describe "ctrl-r in insert mode", ->
         it "insert from per selection registe", ->
-          ensure "diw", text: ":\n:\n:\n"
+          ensure "d i w", text: ":\n:\n:\n"
           ensure 'a', mode: 'insert'
-          ensure [{ctrl: 'r'}, {char: '"'}],
+          ensure ['ctrl-r', input: '"'],
             text: """
               :012
               :abc
               :def\n
               """
+
+  describe "Count modifier", ->
+    beforeEach ->
+      set
+        text: "000 111 222 333 444 555 666 777 888 999"
+        cursor: [0, 0]
+
+    it "repeat operator", ->
+      ensure '3 d w', text: "333 444 555 666 777 888 999"
+    it "repeat motion", ->
+      ensure 'd 2 w', text: "222 333 444 555 666 777 888 999"
+    it "repeat operator and motion respectively", ->
+      ensure '3 d 2 w', text: "666 777 888 999"

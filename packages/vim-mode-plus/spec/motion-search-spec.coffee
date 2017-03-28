@@ -1,6 +1,5 @@
-{getVimState, dispatch, TextData} = require './spec-helper'
+{getVimState, dispatch, TextData, getView} = require './spec-helper'
 settings = require '../lib/settings'
-globalState = require '../lib/global-state'
 
 describe "Motion Search", ->
   [set, ensure, keystroke, editor, editorElement, vimState] = []
@@ -12,7 +11,8 @@ describe "Motion Search", ->
       {set, ensure, keystroke} = _vim
 
   afterEach ->
-    vimState.activate('reset')
+    vimState.resetNormalMode()
+    vimState.globalState.reset()
 
   describe "the / keybinding", ->
     pane = null
@@ -28,10 +28,6 @@ describe "Motion Search", ->
           """
         cursor: [0, 0]
       spyOn(atom.workspace, 'getActivePane').andReturn(pane)
-
-      # clear search history
-      vimState.searchHistory.clear()
-      globalState.currentSearch = null
 
     describe "as a motion", ->
       it "moves the cursor to the specified search pattern", ->
@@ -61,7 +57,7 @@ describe "Motion Search", ->
 
       it 'works with selection in visual mode', ->
         set text: 'one two three'
-        ensure ['v/', search: 'th'], cursor: [0, 9]
+        ensure ['v /', search: 'th'], cursor: [0, 9]
         ensure 'd', text: 'hree'
 
       it 'extends selection when repeating search in visual mode', ->
@@ -71,25 +67,24 @@ describe "Motion Search", ->
           line3
           """
 
-        ensure ['v/', {search: 'line'}],
+        ensure ['v /', search: 'line'],
           selectedBufferRange: [[0, 0], [1, 1]]
         ensure 'n',
           selectedBufferRange: [[0, 0], [2, 1]]
 
       it 'searches to the correct column in visual linewise mode', ->
-        ensure ['V/', {search: 'ef'}],
+        ensure ['V /', search: 'ef'],
           selectedText: "abc\ndef\n",
-          characterwiseHead: [1, 1]
+          propertyHead: [1, 1]
           cursor: [2, 0]
           mode: ['visual', 'linewise']
 
       it 'not extend linwise selection if search matches on same line', ->
-        # settings.set 'incrementalSearch', true
         set text: """
           abc def
           def\n
           """
-        ensure ['V/', {search: 'ef'}],
+        ensure ['V /', search: 'ef'],
           selectedText: "abc def\n",
 
       describe "case sensitivity", ->
@@ -169,10 +164,10 @@ describe "Motion Search", ->
 
       describe "composing", ->
         it "composes with operators", ->
-          ensure ['d/', search: 'def'], text: "def\nabc\ndef\n"
+          ensure ['d /', search: 'def'], text: "def\nabc\ndef\n"
 
         it "repeats correctly with operators", ->
-          ensure ['d/', search: 'def', '.'],
+          ensure ['d /', search: 'def', '.'],
             text: "def\n"
 
     describe "when reversed as ?", ->
@@ -230,72 +225,172 @@ describe "Motion Search", ->
         ensureInputEditor 'core:move-down', text: 'abc'
         ensureInputEditor 'core:move-down', text: ''
 
+    describe "highlightSearch", ->
+      textForMarker = (marker) ->
+        editor.getTextInBufferRange(marker.getBufferRange())
+
+      ensureHightlightSearch = (options) ->
+        markers = vimState.highlightSearch.getMarkers()
+        if options.length?
+          expect(markers).toHaveLength(options.length)
+
+        if options.text?
+          text = markers.map (marker) -> textForMarker(marker)
+          expect(text).toEqual(options.text)
+
+        if options.mode?
+          ensure {mode: options.mode}
+
+      beforeEach ->
+        jasmine.attachToDOM(getView(atom.workspace))
+        settings.set('highlightSearch', true)
+        expect(vimState.highlightSearch.hasMarkers()).toBe(false)
+        ensure ['/', search: 'def'], cursor: [1, 0]
+
+      describe "clearHighlightSearch command", ->
+        it "clear highlightSearch marker", ->
+          ensureHightlightSearch length: 2, text: ["def", "def"], mode: 'normal'
+          dispatch(editorElement, 'vim-mode-plus:clear-highlight-search')
+          expect(vimState.highlightSearch.hasMarkers()).toBe(false)
+
+      describe "clearHighlightSearchOnResetNormalMode", ->
+        describe "default setting", ->
+          it "it won't clear highlightSearch", ->
+            ensureHightlightSearch length: 2, text: ["def", "def"], mode: 'normal'
+            dispatch(editorElement, 'vim-mode-plus:reset-normal-mode')
+            ensureHightlightSearch length: 2, text: ["def", "def"], mode: 'normal'
+
+        describe "when enabled", ->
+          it "it clear highlightSearch on reset-normal-mode", ->
+            settings.set('clearHighlightSearchOnResetNormalMode', true)
+            ensureHightlightSearch length: 2, text: ["def", "def"], mode: 'normal'
+            dispatch(editorElement, 'vim-mode-plus:reset-normal-mode')
+            expect(vimState.highlightSearch.hasMarkers()).toBe(false)
+            ensure mode: 'normal'
+
+  describe "IncrementalSearch", ->
+    beforeEach ->
+      settings.set('incrementalSearch', true)
+      jasmine.attachToDOM(getView(atom.workspace))
+
+    describe "with multiple-cursors", ->
+      beforeEach ->
+        set
+          text: """
+          0:    abc
+          1:    abc
+          2:    abc
+          3:    abc
+          """
+          cursor: [[0, 0], [1, 0]]
+
+      it "[forward] move each cursor to match", ->
+        ensure ['/', search: 'abc'], cursor: [[0, 6], [1, 6]]
+      it "[forward: count specified], move each cursor to match", ->
+        ensure ['2 /', search: 'abc'], cursor: [[1, 6], [2, 6]]
+
+      it "[backward] move each cursor to match", ->
+        ensure ['?', search: 'abc'], cursor: [[3, 6], [0, 6]]
+      it "[backward: count specified] move each cursor to match", ->
+        ensure ['2 ?', search: 'abc'], cursor: [[2, 6], [3, 6]]
+
+    describe "blank input repeat last search", ->
+      beforeEach ->
+        set
+          text: """
+          0:    abc
+          1:    abc
+          2:    abc
+          3:    abc
+          4:
+          """
+
+      it "Do nothing when search history is empty", ->
+        set cursor: [2, 1]
+        ensure ['/', search: ''], cursor: [2, 1]
+        ensure ['?', search: ''], cursor: [2, 1]
+
+      it "Repeat forward direction", ->
+        set cursor: [0, 0]
+        ensure ['/', search: 'abc'], cursor: [0, 6]
+        ensure ['/', search: ''], cursor: [1, 6]
+        ensure ['2 /', search: ''], cursor: [3, 6]
+
+      it "Repeat backward direction", ->
+        set cursor: [4, 0]
+        ensure ['?', search: 'abc'], cursor: [3, 6]
+        ensure ['?', search: ''], cursor: [2, 6]
+        ensure ['2 ?', search: ''], cursor: [0, 6]
+
   describe "the * keybinding", ->
     beforeEach ->
       set
         text: "abd\n@def\nabd\ndef\n"
-        cursorBuffer: [0, 0]
+        cursor: [0, 0]
 
     describe "as a motion", ->
-      it "moves cursor to next occurence of word under cursor", ->
-        ensure '*', cursorBuffer: [2, 0]
+      it "moves cursor to next occurrence of word under cursor", ->
+        ensure '*', cursor: [2, 0]
 
       it "repeats with the n key", ->
-        ensure '*', cursorBuffer: [2, 0]
-        ensure 'n', cursorBuffer: [0, 0]
+        ensure '*', cursor: [2, 0]
+        ensure 'n', cursor: [0, 0]
 
-      it "doesn't move cursor unless next occurence is the exact word (no partial matches)", ->
+      it "doesn't move cursor unless next occurrence is the exact word (no partial matches)", ->
         set
           text: "abc\ndef\nghiabc\njkl\nabcdef"
-          cursorBuffer: [0, 0]
-        ensure '*', cursorBuffer: [0, 0]
+          cursor: [0, 0]
+        ensure '*', cursor: [0, 0]
 
       describe "with words that contain 'non-word' characters", ->
-        it "moves cursor to next occurence of word under cursor", ->
+        it "skips non-word-char when picking cursor-word then place cursor to next occurrence of word", ->
           set
-            text: "abc\n@def\nabc\n@def\n"
-            cursorBuffer: [1, 0]
-          ensure '*', cursorBuffer: [3, 0]
+            text: """
+            abc
+            @def
+            abc
+            @def\n
+            """
+            cursor: [1, 0]
+          ensure '*', cursor: [3, 1]
 
         it "doesn't move cursor unless next match has exact word ending", ->
           set
-            text: "abc\n@def\nabc\n@def1\n"
-            cursorBuffer: [1, 1]
-          # this is because of the default isKeyword value of vim-mode-plus that includes @
-          ensure '*', cursorBuffer: [1, 0]
+            text: """
+            abc
+            @def
+            abc
+            @def1\n
+            """
+            cursor: [1, 1]
+          ensure '*', cursor: [1, 1]
 
-        # FIXME: This behavior is different from the one found in
-        # vim. This is because the word boundary match in Javascript
-        # ignores starting 'non-word' characters.
-        # e.g.
-        # in Vim:        /\<def\>/.test("@def") => false
-        # in Javascript: /\bdef\b/.test("@def") => true
         it "moves cursor to the start of valid word char", ->
           set
             text: "abc\ndef\nabc\n@def\n"
-            cursorBuffer: [1, 0]
-          ensure '*', cursorBuffer: [3, 1]
+            cursor: [1, 0]
+          ensure '*', cursor: [3, 1]
 
       describe "when cursor is on non-word char column", ->
         it "matches only the non-word char", ->
           set
             text: "abc\n@def\nabc\n@def\n"
-            cursorBuffer: [1, 0]
-          ensure '*', cursorBuffer: [3, 0]
+            cursor: [1, 0]
+          ensure '*', cursor: [3, 1]
 
       describe "when cursor is not on a word", ->
         it "does a match with the next word", ->
           set
             text: "abc\na  @def\n abc\n @def"
-            cursorBuffer: [1, 1]
-          ensure '*', cursorBuffer: [3, 1]
+            cursor: [1, 1]
+          ensure '*', cursor: [3, 2]
 
       describe "when cursor is at EOF", ->
         it "doesn't try to do any match", ->
           set
             text: "abc\n@def\nabc\n "
-            cursorBuffer: [3, 0]
-          ensure '*', cursorBuffer: [3, 0]
+            cursor: [3, 0]
+          ensure '*', cursor: [3, 0]
 
     describe "caseSensitivity setting", ->
       beforeEach ->
@@ -311,15 +406,15 @@ describe "Motion Search", ->
 
       it "search case sensitively when `ignoreCaseForSearchCurrentWord` is false(=default)", ->
         expect(settings.get('ignoreCaseForSearchCurrentWord')).toBe(false)
-        ensure '*', cursorBuffer: [3, 0]
-        ensure 'n', cursorBuffer: [0, 0]
+        ensure '*', cursor: [3, 0]
+        ensure 'n', cursor: [0, 0]
 
       it "search case insensitively when `ignoreCaseForSearchCurrentWord` true", ->
         settings.set 'ignoreCaseForSearchCurrentWord', true
-        ensure '*', cursorBuffer: [1, 0]
-        ensure 'n', cursorBuffer: [2, 0]
-        ensure 'n', cursorBuffer: [3, 0]
-        ensure 'n', cursorBuffer: [4, 0]
+        ensure '*', cursor: [1, 0]
+        ensure 'n', cursor: [2, 0]
+        ensure 'n', cursor: [3, 0]
+        ensure 'n', cursor: [4, 0]
 
       describe "useSmartcaseForSearchCurrentWord is enabled", ->
         beforeEach ->
@@ -327,57 +422,57 @@ describe "Motion Search", ->
 
         it "search case sensitively when enable and search term includes uppercase", ->
           set cursor: [1, 0]
-          ensure '*', cursorBuffer: [4, 0]
-          ensure 'n', cursorBuffer: [1, 0]
+          ensure '*', cursor: [4, 0]
+          ensure 'n', cursor: [1, 0]
 
         it "search case insensitively when enable and search term NOT includes uppercase", ->
           set cursor: [0, 0]
-          ensure '*', cursorBuffer: [1, 0]
-          ensure 'n', cursorBuffer: [2, 0]
-          ensure 'n', cursorBuffer: [3, 0]
-          ensure 'n', cursorBuffer: [4, 0]
+          ensure '*', cursor: [1, 0]
+          ensure 'n', cursor: [2, 0]
+          ensure 'n', cursor: [3, 0]
+          ensure 'n', cursor: [4, 0]
 
   describe "the hash keybinding", ->
     describe "as a motion", ->
-      it "moves cursor to previous occurence of word under cursor", ->
+      it "moves cursor to previous occurrence of word under cursor", ->
         set
           text: "abc\n@def\nabc\ndef\n"
-          cursorBuffer: [2, 1]
-        ensure '#', cursorBuffer: [0, 0]
+          cursor: [2, 1]
+        ensure '#', cursor: [0, 0]
 
       it "repeats with n", ->
         set
           text: "abc\n@def\nabc\ndef\nabc\n"
-          cursorBuffer: [2, 1]
-        ensure '#', cursorBuffer: [0, 0]
-        ensure 'n', cursorBuffer: [4, 0]
-        ensure 'n', cursorBuffer: [2, 0]
+          cursor: [2, 1]
+        ensure '#', cursor: [0, 0]
+        ensure 'n', cursor: [4, 0]
+        ensure 'n', cursor: [2, 0]
 
-      it "doesn't move cursor unless next occurence is the exact word (no partial matches)", ->
+      it "doesn't move cursor unless next occurrence is the exact word (no partial matches)", ->
         set
           text: "abc\ndef\nghiabc\njkl\nabcdef"
-          cursorBuffer: [0, 0]
-        ensure '#', cursorBuffer: [0, 0]
+          cursor: [0, 0]
+        ensure '#', cursor: [0, 0]
 
       describe "with words that containt 'non-word' characters", ->
-        it "moves cursor to next occurence of word under cursor", ->
+        it "moves cursor to next occurrence of word under cursor", ->
           set
             text: "abc\n@def\nabc\n@def\n"
-            cursorBuffer: [3, 0]
-          ensure '#', cursorBuffer: [1, 0]
+            cursor: [3, 0]
+          ensure '#', cursor: [1, 1]
 
         it "moves cursor to the start of valid word char", ->
           set
             text: "abc\n@def\nabc\ndef\n"
-            cursorBuffer: [3, 0]
-          ensure '#', cursorBuffer: [1, 1]
+            cursor: [3, 0]
+          ensure '#', cursor: [1, 1]
 
       describe "when cursor is on non-word char column", ->
         it "matches only the non-word char", ->
           set
             text: "abc\n@def\nabc\n@def\n"
-            cursorBuffer: [1, 0]
-          ensure '*', cursorBuffer: [3, 0]
+            cursor: [1, 0]
+          ensure '*', cursor: [3, 1]
 
     describe "caseSensitivity setting", ->
       beforeEach ->
@@ -393,15 +488,15 @@ describe "Motion Search", ->
 
       it "search case sensitively when `ignoreCaseForSearchCurrentWord` is false(=default)", ->
         expect(settings.get('ignoreCaseForSearchCurrentWord')).toBe(false)
-        ensure '#', cursorBuffer: [1, 0]
-        ensure 'n', cursorBuffer: [4, 0]
+        ensure '#', cursor: [1, 0]
+        ensure 'n', cursor: [4, 0]
 
       it "search case insensitively when `ignoreCaseForSearchCurrentWord` true", ->
         settings.set 'ignoreCaseForSearchCurrentWord', true
-        ensure '#', cursorBuffer: [3, 0]
-        ensure 'n', cursorBuffer: [2, 0]
-        ensure 'n', cursorBuffer: [1, 0]
-        ensure 'n', cursorBuffer: [0, 0]
+        ensure '#', cursor: [3, 0]
+        ensure 'n', cursor: [2, 0]
+        ensure 'n', cursor: [1, 0]
+        ensure 'n', cursor: [0, 0]
 
       describe "useSmartcaseForSearchCurrentWord is enabled", ->
         beforeEach ->
@@ -409,16 +504,16 @@ describe "Motion Search", ->
 
         it "search case sensitively when enable and search term includes uppercase", ->
           set cursor: [4, 0]
-          ensure '#', cursorBuffer: [1, 0]
-          ensure 'n', cursorBuffer: [4, 0]
+          ensure '#', cursor: [1, 0]
+          ensure 'n', cursor: [4, 0]
 
         it "search case insensitively when enable and search term NOT includes uppercase", ->
           set cursor: [0, 0]
-          ensure '#', cursorBuffer: [4, 0]
-          ensure 'n', cursorBuffer: [3, 0]
-          ensure 'n', cursorBuffer: [2, 0]
-          ensure 'n', cursorBuffer: [1, 0]
-          ensure 'n', cursorBuffer: [0, 0]
+          ensure '#', cursor: [4, 0]
+          ensure 'n', cursor: [3, 0]
+          ensure 'n', cursor: [2, 0]
+          ensure 'n', cursor: [1, 0]
+          ensure 'n', cursor: [0, 0]
 
   # FIXME: No longer child of search so move to motion-general-spec.coffe?
   describe 'the % motion', ->
@@ -430,10 +525,10 @@ describe "Motion Search", ->
           set text: "(_(_)_)"
         it 'behave inclusively when is at open pair', ->
           set cursor: [0, 2]
-          ensure 'd%', text: "(__)"
+          ensure 'd %', text: "(__)"
         it 'behave inclusively when is at open pair', ->
           set cursor: [0, 4]
-          ensure 'd%', text: "(__)"
+          ensure 'd %', text: "(__)"
       describe "cursor is at pair char", ->
         it "cursor is at open pair, it move to closing pair", ->
           set cursor: [0, 0]
@@ -532,3 +627,35 @@ describe "Motion Search", ->
       it 'enclosing pair is prioritized over forwarding range', ->
         set cursor: [0, 2]
         ensure '%', cursor: [0, 0]
+
+    describe "complex situation with html tag", ->
+      beforeEach ->
+        set
+          text: """
+          <div>
+            <span>
+              some text
+            </span>
+          </div>
+          """
+      it 'when cursor is on AngleBracket(<, >), it moves to opposite AngleBracket', ->
+        set cursor: [0, 0]
+        ensure '%', cursor: [0, 4]
+        ensure '%', cursor: [0, 0]
+      it 'can find forwarding range of AngleBracket', ->
+        set cursor: [1, 0]
+        ensure '%', cursor: [1, 7]
+        ensure '%', cursor: [1, 2]
+      it 'move to pair tag only when cursor is on open or close tag but not on AngleBracket(<, >)', ->
+        set cursor: [0, 0]; ensure '%', cursor: [0, 4] # on '<' of <div>
+        set cursor: [0, 1]; ensure '%', cursor: [4, 1]
+        set cursor: [0, 2]; ensure '%', cursor: [4, 1]
+        set cursor: [0, 3]; ensure '%', cursor: [4, 1]
+        set cursor: [0, 4]; ensure '%', cursor: [0, 0] # on '>' of <div>
+
+        set cursor: [4, 0]; ensure '%', cursor: [4, 5] # on '<' of </div>
+        set cursor: [4, 1]; ensure '%', cursor: [0, 1]
+        set cursor: [4, 2]; ensure '%', cursor: [0, 1]
+        set cursor: [4, 3]; ensure '%', cursor: [0, 1]
+        set cursor: [4, 4]; ensure '%', cursor: [0, 1]
+        set cursor: [4, 5]; ensure '%', cursor: [4, 0] # on '>' of </div>

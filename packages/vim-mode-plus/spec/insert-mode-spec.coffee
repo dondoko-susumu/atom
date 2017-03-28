@@ -10,7 +10,7 @@ describe "Insert mode commands", ->
       {set, ensure, keystroke} = vim
 
   afterEach ->
-    vimState.activate('reset')
+    vimState.resetNormalMode()
 
   describe "Copy from line above/below", ->
     beforeEach ->
@@ -21,12 +21,12 @@ describe "Insert mode commands", ->
           abcd
           efghi
           """
-        cursorBuffer: [[1, 0], [3, 0]]
+        cursor: [[1, 0], [3, 0]]
       keystroke 'i'
 
     describe "the ctrl-y command", ->
       it "copies from the line above", ->
-        ensure {ctrl: 'y'},
+        ensure 'ctrl-y',
           text: """
             12345
             1
@@ -34,7 +34,7 @@ describe "Insert mode commands", ->
             aefghi
             """
         editor.insertText ' '
-        ensure {ctrl: 'y'},
+        ensure 'ctrl-y',
           text: """
             12345
             1 3
@@ -44,14 +44,14 @@ describe "Insert mode commands", ->
 
       it "does nothing if there's nothing above the cursor", ->
         editor.insertText 'fill'
-        ensure {ctrl: 'y'},
+        ensure 'ctrl-y',
           text: """
             12345
             fill5
             abcd
             fillefghi
             """
-        ensure {ctrl: 'y'},
+        ensure 'ctrl-y',
           text: """
             12345
             fill5
@@ -61,7 +61,7 @@ describe "Insert mode commands", ->
 
       it "does nothing on the first line", ->
         set
-          cursorBuffer: [[0, 2], [3, 2]]
+          cursor: [[0, 2], [3, 2]]
         editor.insertText 'a'
         ensure
           text: """
@@ -70,7 +70,7 @@ describe "Insert mode commands", ->
             abcd
             efaghi
             """
-        ensure {ctrl: 'y'},
+        ensure 'ctrl-y',
           text: """
             12a345
 
@@ -85,7 +85,7 @@ describe "Insert mode commands", ->
             'ctrl-e': 'vim-mode-plus:copy-from-line-below'
 
       it "copies from the line below", ->
-        ensure {ctrl: 'e'},
+        ensure 'ctrl-e',
           text: """
             12345
             a
@@ -93,7 +93,7 @@ describe "Insert mode commands", ->
             efghi
             """
         editor.insertText ' '
-        ensure {ctrl: 'e'},
+        ensure 'ctrl-e',
           text: """
             12345
             a c
@@ -103,14 +103,14 @@ describe "Insert mode commands", ->
 
       it "does nothing if there's nothing below the cursor", ->
         editor.insertText 'foo'
-        ensure {ctrl: 'e'},
+        ensure 'ctrl-e',
           text: """
             12345
             food
             abcd
             fooefghi
             """
-        ensure {ctrl: 'e'},
+        ensure 'ctrl-e',
           text: """
             12345
             food
@@ -124,7 +124,7 @@ describe "Insert mode commands", ->
         keystroke key
         editor.insertText(insert)
         ensure "escape", text: text
-        ensure ["GI", {ctrl: 'a'}], text: finalText
+        ensure "G I ctrl-a", text: finalText
 
       beforeEach ->
         atom.keymaps.add "test",
@@ -138,7 +138,9 @@ describe "Insert mode commands", ->
         set text: "", cursor: [0, 0]
         keystroke 'i'
         editor.insertText(initialText)
-        ensure ["escape", 'gg'], text: initialText, cursor: [0, 0]
+        ensure "escape g g",
+          text: initialText
+          cursor: [0, 0]
 
       it "case-i: single-line", ->
         ensureInsertLastInserted 'i',

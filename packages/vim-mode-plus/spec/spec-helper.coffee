@@ -1,7 +1,12 @@
 _ = require 'underscore-plus'
-{Range, Point} = require 'atom'
+semver = require 'semver'
+{Range, Point, Disposable} = require 'atom'
 {inspect} = require 'util'
 swrap = require '../lib/selection-wrapper'
+settings = require '../lib/settings'
+
+KeymapManager = atom.keymaps.constructor
+{normalizeKeystrokes} = require(atom.config.resourcePath + "/node_modules/atom-keymap/lib/helpers")
 
 supportedModeClass = [
   'normal-mode'
@@ -13,11 +18,6 @@ supportedModeClass = [
   'characterwise'
 ]
 
-packageName = 'vim-mode-plus'
-class SpecError
-  constructor: (@message) ->
-    @name = 'SpecError'
-
 # Utils
 # -------------------------
 getView = (model) ->
@@ -26,58 +26,56 @@ getView = (model) ->
 dispatch = (target, command) ->
   atom.commands.dispatch(target, command)
 
-mockPlatform = (editorElement, platform) ->
+withMockPlatform = (target, platform, fn) ->
   wrapper = document.createElement('div')
   wrapper.className = platform
-  wrapper.appendChild(editorElement)
+  wrapper.appendChild(target)
+  fn()
+  target.parentNode.removeChild(target)
 
-unmockPlatform = (editorElement) ->
-  editorElement.parentNode.removeChild(editorElement)
+buildKeydownEvent = (key, options) ->
+  KeymapManager.buildKeydownEvent(key, options)
 
-dispatchKeyboardEvent = (target, eventArgs...) ->
-  e = document.createEvent('KeyboardEvent')
-  e.initKeyboardEvent(eventArgs...)
-  # 0 is the default, and it's valid ASCII, but it's wrong.
-  if e.keyCode is 0
-    Object.defineProperty(e, 'keyCode', get: -> undefined)
-  target.dispatchEvent e
+getHeadProperty = (selection) ->
+  swrap(selection).getBufferPositionFor('head', from: ['property'])
 
-dispatchTextEvent = (target, eventArgs...) ->
-  e = document.createEvent('TextEvent')
-  e.initTextEvent(eventArgs...)
-  target.dispatchEvent e
+getTailProperty = (selection) ->
+  swrap(selection).getBufferPositionFor('tail', from: ['property'])
 
-keydown = (key, {element, ctrl, shift, alt, meta, raw}={}) ->
-  unless key is 'escape' or raw?
-    key = "U+#{key.charCodeAt(0).toString(16)}"
-  element ?= document.activeElement
-  eventArgs = [
-    false, # bubbles
-    true, # cancelable
-    null, # view
-    key,  # key
-    0,    # location
-    ctrl, alt, shift, meta
-  ]
-
-  canceled = not dispatchKeyboardEvent(element, 'keydown', eventArgs...)
-  # [FIXME] I think I can remove keypress event dispatch.
-  dispatchKeyboardEvent(element, 'keypress', eventArgs...)
-  unless canceled
-    if dispatchTextEvent(element, 'textInput', eventArgs...)
-      element.value += key
-  dispatchKeyboardEvent(element, 'keyup', eventArgs...)
-
-_keystroke = (keys, event) ->
-  if keys in ['escape', 'backspace']
-    keydown keys, event
+buildKeydownEventFromKeystroke = (keystroke, target) ->
+  modifier = ['ctrl', 'alt', 'shift', 'cmd']
+  parts = if keystroke is '-'
+    ['-']
   else
-    for key in keys.split('')
-      if key.match(/[A-Z]/)
-        event.shift = true
-      else
-        delete event.shift
-      keydown key, event
+    keystroke.split('-')
+
+  options = {target}
+  key = null
+  for part in parts
+    if part in modifier
+      options[part] = true
+    else
+      key = part
+
+  if semver.satisfies(atom.getVersion(), '< 1.12')
+    key = ' ' if key is 'space'
+  buildKeydownEvent(key, options)
+
+buildTextInputEvent = (key) ->
+  eventArgs = [
+    true # bubbles
+    true # cancelable
+    window # view
+    key  # key char
+  ]
+  event = document.createEvent('TextEvent')
+  event.initTextEvent("textInput", eventArgs...)
+  event
+
+rawKeystroke = (keystrokes, target) ->
+  for key in normalizeKeystrokes(keystrokes).split(/\s+/)
+    event = buildKeydownEventFromKeystroke(key, target)
+    atom.keymaps.handleKeyboardEvent(event)
 
 isPoint = (obj) ->
   if obj instanceof Point
@@ -120,21 +118,15 @@ getVimState = (args...) ->
     when 2 then [file, callback] = args
 
   waitsForPromise ->
-    atom.packages.activatePackage(packageName)
+    atom.packages.activatePackage('vim-mode-plus')
 
   waitsForPromise ->
     file = atom.project.resolvePath(file) if file
-    atom.workspace.open(file).then (e) ->
-      editor = e
+    atom.workspace.open(file).then (e) -> editor = e
 
   runs ->
-    pack = atom.packages.getActivePackage(packageName)
-    main = pack.mainModule
+    main = atom.packages.getActivePackage('vim-mode-plus').mainModule
     vimState = main.getEditorState(editor)
-    {editorElement} = vimState
-    editorElement.addEventListener 'keydown', (e) ->
-      atom.keymaps.handleKeyboardEvent(e)
-
     callback(vimState, new VimEditor(vimState))
 
 class TextData
@@ -152,6 +144,21 @@ class TextData
   getRaw: ->
     @rawData
 
+collectIndexInText = (char, text) ->
+  indexes = []
+  fromIndex = 0
+  while (index = text.indexOf(char, fromIndex)) >= 0
+    fromIndex = index + 1
+    indexes.push(index)
+  indexes
+
+collectCharPositionsInText = (char, text) ->
+  positions = []
+  for lineText, rowNumber in text.split(/\n/)
+    for index, i in collectIndexInText(char, lineText)
+      positions.push([rowNumber, index - i])
+  positions
+
 class VimEditor
   constructor: (@vimState) ->
     {@editor, @editorElement} = @vimState
@@ -159,20 +166,34 @@ class VimEditor
   validateOptions: (options, validOptions, message) ->
     invalidOptions = _.without(_.keys(options), validOptions...)
     if invalidOptions.length
-      throw new SpecError("#{message}: #{inspect(invalidOptions)}")
+      throw new Error("#{message}: #{inspect(invalidOptions)}")
+
+  validateExclusiveOptions: (options, rules) ->
+    allOptions = Object.keys(options)
+    for option, exclusiveOptions of rules when option of options
+      violatingOptions = exclusiveOptions.filter (exclusiveOption) -> exclusiveOption in allOptions
+      if violatingOptions.length
+        throw new Error("#{option} is exclusive with [#{violatingOptions}]")
 
   setOptionsOrdered = [
-    'text',
+    'text', 'text_',
+    'textC', 'textC_',
     'grammar',
-    'cursor', 'cursorBuffer',
-    'addCursor', 'addCursorBuffer'
+    'cursor', 'cursorScreen'
+    'addCursor', 'cursorScreen'
     'register',
     'selectedBufferRange'
   ]
 
+  setExclusiveRules =
+    textC: ['cursor', 'cursorScreen']
+    textC_: ['cursor', 'cursorScreen']
+
   # Public
   set: (options) =>
     @validateOptions(options, setOptionsOrdered, 'Invalid set options')
+    @validateExclusiveOptions(options, setExclusiveRules)
+
     for name in setOptionsOrdered when options[name]?
       method = 'set' + _.capitalize(_.camelize(name))
       this[method](options[name])
@@ -180,26 +201,36 @@ class VimEditor
   setText: (text) ->
     @editor.setText(text)
 
+  setText_: (text) ->
+    @setText(text.replace(/_/g, ' '))
+
+  setTextC: (text) ->
+    cursors = collectCharPositionsInText('|', text.replace(/!/g, ''))
+    lastCursor = collectCharPositionsInText('!', text.replace(/\|/g, ''))
+    @setText(text.replace(/[\|!]/g, ''))
+    cursors = cursors.concat(lastCursor)
+    if cursors.length
+      @setCursor(cursors)
+
+  setTextC_: (text) ->
+    @setTextC(text.replace(/_/g, ' '))
+
   setGrammar: (scope) ->
     @editor.setGrammar(atom.grammars.grammarForScopeName(scope))
 
   setCursor: (points) ->
     points = toArrayOfPoint(points)
-    @editor.setCursorScreenPosition(points.shift())
-    for point in points
-      @editor.addCursorAtScreenPosition(point)
-
-  setCursorBuffer: (points) ->
-    points = toArrayOfPoint(points)
     @editor.setCursorBufferPosition(points.shift())
     for point in points
       @editor.addCursorAtBufferPosition(point)
 
-  setAddCursor: (points) ->
-    for point in toArrayOfPoint(points)
+  setCursorScreen: (points) ->
+    points = toArrayOfPoint(points)
+    @editor.setCursorScreenPosition(points.shift())
+    for point in points
       @editor.addCursorAtScreenPosition(point)
 
-  setAddCursorBuffer: (points) ->
+  setAddCursor: (points) ->
     for point in toArrayOfPoint(points)
       @editor.addCursorAtBufferPosition(point)
 
@@ -211,27 +242,46 @@ class VimEditor
     @editor.setSelectedBufferRange(range)
 
   ensureOptionsOrdered = [
-    'text',
-    'selectedText', 'selectedTextOrdered'
-    'cursor', 'cursorBuffer',
+    'text', 'text_',
+    'textC', 'textC_',
+    'selectedText', 'selectedText_', 'selectedTextOrdered', "selectionIsNarrowed"
+    'cursor', 'cursorScreen'
     'numCursors'
     'register',
     'selectedScreenRange', 'selectedScreenRangeOrdered'
     'selectedBufferRange', 'selectedBufferRangeOrdered'
     'selectionIsReversed',
-    'characterwiseHead'
+    'persistentSelectionBufferRange', 'persistentSelectionCount'
+    'occurrenceCount', 'occurrenceText'
+    'propertyHead'
+    'propertyTail'
     'scrollTop',
+    'mark'
     'mode',
   ]
+  ensureExclusiveRules =
+    textC: ['cursor', 'cursorScreen']
+    textC_: ['cursor', 'cursorScreen']
+
+  getAndDeleteKeystrokeOptions: (options) ->
+    {partialMatchTimeout} = options
+    delete options.partialMatchTimeout
+    {partialMatchTimeout}
+
   # Public
   ensure: (args...) =>
     switch args.length
       when 1 then [options] = args
       when 2 then [keystroke, options] = args
+
+    keystrokeOptions = @getAndDeleteKeystrokeOptions(options)
+
     @validateOptions(options, ensureOptionsOrdered, 'Invalid ensure option')
+    @validateExclusiveOptions(options, ensureExclusiveRules)
+
     # Input
     unless _.isEmpty(keystroke)
-      @keystroke(keystroke)
+      @keystroke(keystroke, keystrokeOptions)
 
     for name in ensureOptionsOrdered when options[name]?
       method = 'ensure' + _.capitalize(_.camelize(name))
@@ -239,6 +289,26 @@ class VimEditor
 
   ensureText: (text) ->
     expect(@editor.getText()).toEqual(text)
+
+  ensureText_: (text) ->
+    @ensureText(text.replace(/_/g, ' '))
+
+  ensureTextC: (text) ->
+    cursors = collectCharPositionsInText('|', text.replace(/!/g, ''))
+    lastCursor = collectCharPositionsInText('!', text.replace(/\|/g, ''))
+    cursors = cursors.concat(lastCursor)
+    cursors = cursors
+      .map (point) -> Point.fromObject(point)
+      .sort (a, b) -> a.compare(b)
+    @ensureText(text.replace(/[\|!]/g, ''))
+    if cursors.length
+      @ensureCursor(cursors, true)
+
+    if lastCursor.length
+      expect(@editor.getCursorBufferPosition()).toEqual(lastCursor[0])
+
+  ensureTextC_: (text) ->
+    @ensureTextC(text.replace(/_/g, ' '))
 
   ensureSelectedText: (text, ordered=false) ->
     selections = if ordered
@@ -248,15 +318,23 @@ class VimEditor
     actual = (s.getText() for s in selections)
     expect(actual).toEqual(toArray(text))
 
+  ensureSelectedText_: (text, ordered) ->
+    @ensureSelectedText(text.replace(/_/g, ' '), ordered)
+
+  ensureSelectionIsNarrowed: (isNarrowed) ->
+    actual = @vimState.modeManager.isNarrowed()
+    expect(actual).toEqual(isNarrowed)
+
   ensureSelectedTextOrdered: (text) ->
     @ensureSelectedText(text, true)
 
-  ensureCursor: (points) ->
-    actual = @editor.getCursorScreenPositions()
+  ensureCursor: (points, ordered=false) ->
+    actual = @editor.getCursorBufferPositions()
+    actual = actual.sort (a, b) -> a.compare(b) if ordered
     expect(actual).toEqual(toArrayOfPoint(points))
 
-  ensureCursorBuffer: (points) ->
-    actual = @editor.getCursorBufferPositions()
+  ensureCursorScreen: (points) ->
+    actual = @editor.getCursorScreenPositions()
     expect(actual).toEqual(toArrayOfPoint(points))
 
   ensureRegister: (register) ->
@@ -291,19 +369,47 @@ class VimEditor
     @ensureSelectedBufferRange(range, true)
 
   ensureSelectionIsReversed: (reversed) ->
-    actual = @editor.getLastSelection().isReversed()
-    expect(actual).toBe(reversed)
+    for selection in @editor.getSelections()
+      actual = selection.isReversed()
+      expect(actual).toBe(reversed)
 
-  ensureCharacterwiseHead: (points) ->
-    actual = (swrap(s).getCharacterwiseHeadPosition() for s in @editor.getSelections())
+  ensurePersistentSelectionBufferRange: (range) ->
+    actual = @vimState.persistentSelection.getMarkerBufferRanges()
+    expect(actual).toEqual(toArrayOfRange(range))
+
+  ensurePersistentSelectionCount: (number) ->
+    actual = @vimState.persistentSelection.getMarkerCount()
+    expect(actual).toBe number
+
+  ensureOccurrenceCount: (number) ->
+    actual = @vimState.occurrenceManager.getMarkerCount()
+    expect(actual).toBe number
+
+  ensureOccurrenceText: (text) ->
+    markers = @vimState.occurrenceManager.getMarkers()
+    ranges = (r.getBufferRange() for r in markers)
+    actual = (@editor.getTextInBufferRange(r) for r in ranges)
+    expect(actual).toEqual(toArray(text))
+
+  ensurePropertyHead: (points) ->
+    actual = (getHeadProperty(s) for s in @editor.getSelections())
+    expect(actual).toEqual(toArrayOfPoint(points))
+
+  ensurePropertyTail: (points) ->
+    actual = (getTailProperty(s) for s in @editor.getSelections())
     expect(actual).toEqual(toArrayOfPoint(points))
 
   ensureScrollTop: (scrollTop) ->
     actual = @editorElement.getScrollTop()
     expect(actual).toEqual scrollTop
 
+  ensureMark: (mark) ->
+    for name, point of mark
+      actual = @vimState.mark.get(name)
+      expect(actual).toEqual(point)
+
   ensureMode: (mode) ->
-    mode = toArray(mode)
+    mode = toArray(mode).slice()
     expect(@vimState.isMode(mode...)).toBe(true)
 
     mode[0] = "#{mode[0]}-mode"
@@ -316,8 +422,9 @@ class VimEditor
       expect(@editorElement.classList.contains(m)).toBe(false)
 
   # Public
+  # options
+  # - waitsForFinish
   keystroke: (keys, options={}) =>
-    {element} = options
     if options.waitsForFinish
       finished = false
       @vimState.onDidFinishOperation -> finished = true
@@ -328,35 +435,24 @@ class VimEditor
 
     # keys must be String or Array
     # Not support Object for keys to avoid ambiguity.
-    element ?= @editorElement
-    mocked = null
-    keys = [keys] unless _.isArray(keys)
+    target = @editorElement
 
-    for k in keys
+    for k in toArray(keys)
       if _.isString(k)
-        _keystroke(k, {element})
+        rawKeystroke(k, target)
       else
         switch
-          when k.platform?
-            mockPlatform(element, k.platform)
-            mocked = true
-          when k.char?
-            chars =
-              # [FIXME] Cause insertText('escape'), useless.
-              if k.char in ['', 'escape']
-                toArray(k.char)
-              else
-                k.char.split('')
-            for c in chars
-              @vimState.input.editor.insertText(c)
+          when k.input?
+            # TODO no longer need to use [input: 'char'] style.
+            # if settings.
+            rawKeystroke(_key, target) for _key in k.input.split('')
           when k.search?
-            {editor, editorElement} = @vimState.searchInput
-            editor.insertText(k.search)
-            atom.commands.dispatch(editorElement, 'core:confirm')
-          when k.ctrl? then _keystroke(k.ctrl, {ctrl: true, element})
-          when k.cmd? then _keystroke(k.cmd, {meta: true, element})
-          when k.raw? then _keystroke(k.raw, {raw: true, element})
-    if mocked
-      unmockPlatform(element)
+            @vimState.searchInput.editor.insertText(k.search) if k.search
+            atom.commands.dispatch(@vimState.searchInput.editorElement, 'core:confirm')
+          else
+            rawKeystroke(k, target)
 
-module.exports = {getVimState, getView, dispatch, TextData}
+    if options.partialMatchTimeout
+      advanceClock(atom.keymaps.getPartialMatchTimeout())
+
+module.exports = {getVimState, getView, dispatch, TextData, withMockPlatform, rawKeystroke}

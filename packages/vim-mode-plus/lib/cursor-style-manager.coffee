@@ -1,88 +1,79 @@
 {Point, Disposable, CompositeDisposable} = require 'atom'
-
-settings = require './settings'
+Delegato = require 'delegato'
 swrap = require './selection-wrapper'
-isSpecMode = atom.inSpecMode()
-lineHeight = null
 
-getCursorNode = (editorElement, cursor) ->
-  cursorsComponent = editorElement.component.linesComponent.cursorsComponent
-  cursorsComponent.cursorNodesById[cursor.id]
-
-# Return cursor style offset(top, left)
-# ---------------------------------------
-getOffset = (submode, cursor, isSoftWrapped) ->
-  {selection, editor} = cursor
-  traversal = new Point(0, 0)
-  switch submode
-    when 'characterwise', 'blockwise'
-      if not selection.isReversed() and not cursor.isAtBeginningOfLine()
-        traversal.column -= 1
-    when 'linewise'
-      bufferPoint = swrap(selection).getCharacterwiseHeadPosition()
-      # FIXME need to update original getCharacterwiseHeadPosition?
-      # to reflect outer vmp command modify linewise selection?
-      [startRow, endRow] = selection.getBufferRowRange()
-      if selection.isReversed()
-        bufferPoint.row = startRow
-
-      traversal = if isSoftWrapped
-        screenPoint = editor.screenPositionForBufferPosition(bufferPoint)
-        screenPoint.traversalFrom(cursor.getScreenPosition())
-      else
-        bufferPoint.traversalFrom(cursor.getBufferPosition())
-  if not selection.isReversed() and cursor.isAtBeginningOfLine() and submode isnt 'blockwise'
-    traversal.row = -1
-  traversal
-
-setStyle = (style, {row, column}) ->
-  style.setProperty('top', "#{row * lineHeight}em") unless row is 0
-  style.setProperty('left', "#{column}ch") unless column is 0
-  new Disposable ->
-    style.removeProperty('top')
-    style.removeProperty('left')
-
-# Display cursor in visual mode.
+# Display cursor in visual-mode
 # ----------------------------------
 class CursorStyleManager
+  lineHeight: null
+
+  Delegato.includeInto(this)
+  @delegatesProperty('mode', 'submode', toProperty: 'vimState')
+
   constructor: (@vimState) ->
     {@editorElement, @editor} = @vimState
-    @lineHeightObserver = atom.config.observe 'editor.lineHeight', (newValue) =>
-      lineHeight = newValue
-      @refresh()
+    @subscriptions = new CompositeDisposable
+    @subscriptions.add atom.config.observe('editor.lineHeight', @refresh)
+    @subscriptions.add atom.config.observe('editor.fontSize', @refresh)
 
   destroy: ->
-    @subscriptions?.dispose()
-    @lineHeightObserver.dispose()
-    {@subscriptions, @lineHeightObserver} = {}
+    @styleDisposables?.dispose()
+    @subscriptions.dispose()
 
-  refresh: ->
-    {submode} = @vimState
-    @subscriptions?.dispose()
-    @subscriptions = new CompositeDisposable
-    return unless (@vimState.isMode('visual') and settings.get('showCursorInVisualMode'))
+  refresh: =>
+    # Intentionally skip in spec mode, since not all spec have DOM attached( and don't want to ).
+    return if atom.inSpecMode()
+    @lineHeight = @editor.getLineHeightInPixels()
 
-    cursors = cursorsToShow = @editor.getCursors()
-    if submode is 'blockwise'
-      cursorsToShow = @vimState.getBlockwiseSelections().map (bs) -> bs.getHead().cursor
+    # We must dispose previous style modification for non-visual-mode
+    @styleDisposables?.dispose()
+    return unless (@mode is 'visual' and @vimState.getConfig('showCursorInVisualMode'))
 
-    # update visibility
-    for cursor in cursors
-      if cursor in cursorsToShow
-        cursor.setVisible(true) unless cursor.isVisible()
-      else
-        cursor.setVisible(false) if cursor.isVisible()
+    @styleDisposables = new CompositeDisposable
+    if @submode is 'blockwise'
+      cursorsToShow = @vimState.getBlockwiseSelections().map (bs) -> bs.getHeadSelection().cursor
+    else
+      cursorsToShow = @editor.getCursors()
 
-    # [NOTE] In BlockwiseSelect we add selections(and corresponding cursors) in bluk.
-    # But corresponding cursorsComponent(HTML element) is added in sync.
-    # So to modify style of cursorsComponent, we have to make sure corresponding cursorsComponent
-    # is available by component in sync to model.
+    # In blockwise, show only blockwise-head cursor
+    for cursor in @editor.getCursors()
+      cursor.setVisible(cursor in cursorsToShow)
+
+    # FIXME: in occurrence, in vB, multi-selections are added during operation but selection is added asynchronously.
+    # We need to make sure that corresponding cursor's domNode is available to modify it's style.
     @editorElement.component.updateSync()
 
-    # [FIXME] In spec mode, we skip here since not all spec have dom attached.
-    return if isSpecMode
-    isSoftWrapped = @editor.isSoftWrapped()
-    for cursor in cursorsToShow when cursorNode = getCursorNode(@editorElement, cursor)
-      @subscriptions.add setStyle(cursorNode.style, getOffset(submode, cursor, isSoftWrapped))
+    # [NOTE] Using non-public API
+    cursorNodesById = @editorElement.component.linesComponent.cursorsComponent.cursorNodesById
+    for cursor in cursorsToShow when cursorNode = cursorNodesById[cursor.id]
+      @styleDisposables.add @modifyStyle(cursor, cursorNode)
+
+  getCursorBufferPositionToDisplay: (selection) ->
+    bufferPosition = swrap(selection).getBufferPositionFor('head', from: ['property'])
+    if @editor.hasAtomicSoftTabs() and not selection.isReversed()
+      screenPosition = @editor.screenPositionForBufferPosition(bufferPosition.translate([0, +1]), clipDirection: 'forward')
+      bufferPositionToDisplay = @editor.bufferPositionForScreenPosition(screenPosition).translate([0, -1])
+      if bufferPositionToDisplay.isGreaterThan(bufferPosition)
+        bufferPosition = bufferPositionToDisplay
+
+    @editor.clipBufferPosition(bufferPosition)
+
+  # Apply selection property's traversal from actual cursor to cursorNode's style
+  modifyStyle: (cursor, domNode) ->
+    selection = cursor.selection
+    bufferPosition = @getCursorBufferPositionToDisplay(selection)
+
+    if @submode is 'linewise' and @editor.isSoftWrapped()
+      screenPosition = @editor.screenPositionForBufferPosition(bufferPosition)
+      {row, column} = screenPosition.traversalFrom(cursor.getScreenPosition())
+    else
+      {row, column} = bufferPosition.traversalFrom(cursor.getBufferPosition())
+
+    style = domNode.style
+    style.setProperty('top', "#{@lineHeight * row}px") if row
+    style.setProperty('left', "#{column}ch") if column
+    new Disposable ->
+      style.removeProperty('top')
+      style.removeProperty('left')
 
 module.exports = CursorStyleManager

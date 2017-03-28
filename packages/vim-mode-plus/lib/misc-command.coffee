@@ -1,106 +1,136 @@
-{Range} = require 'atom'
+{Range, Point} = require 'atom'
 Base = require './base'
 swrap = require './selection-wrapper'
-settings = require './settings'
 _ = require 'underscore-plus'
 
 {
+  moveCursorRight
   isLinewiseRange
-  pointIsAtEndOfLine
-  mergeIntersectingRanges
-  highlightRanges
+  setBufferRow
+  sortRanges
+  findRangeContainsPoint
+  isSingleLineRange
+  isLeadingWhiteSpaceRange
+  humanizeBufferRange
 } = require './utils'
 
 class MiscCommand extends Base
   @extend(false)
   constructor: ->
     super
-    @initialize?()
+    @initialize()
+
+class Mark extends MiscCommand
+  @extend()
+  requireInput: true
+  initialize: ->
+    @focusInput()
+    super
+
+  execute: ->
+    @vimState.mark.set(@input, @editor.getCursorBufferPosition())
+    @activateMode('normal')
 
 class ReverseSelections extends MiscCommand
   @extend()
   execute: ->
-    # FIXME? need to care
-    # not all selection reversed state is in-sync?
-    # In that case make it sync in operationStack::process.
-    swrap.reverse(@editor)
+    swrap.setReversedState(@editor, not @editor.getLastSelection().isReversed())
+    if @isMode('visual', 'blockwise')
+      @getLastBlockwiseSelection().autoscroll()
 
 class BlockwiseOtherEnd extends ReverseSelections
   @extend()
   execute: ->
-    bs.reverse() for bs in @getBlockwiseSelections()
+    for blockwiseSelection in @getBlockwiseSelections()
+      blockwiseSelection.reverse()
     super
 
 class Undo extends MiscCommand
   @extend()
 
-  saveRangeAsMarker: (markers, range) ->
-    if _.all(markers, (m) -> not m.getBufferRange().intersectsWith(range))
-      markers.push @editor.markBufferRange(range)
+  setCursorPosition: ({newRanges, oldRanges, strategy}) ->
+    lastCursor = @editor.getLastCursor() # This is restored cursor
 
-  trimEndOfLineRange: (range) ->
-    {start} = range
-    if (start.column isnt 0) and pointIsAtEndOfLine(@editor, start)
-      range.traverse([+1, 0], [0, 0])
+    if strategy is 'smart'
+      changedRange = findRangeContainsPoint(newRanges, lastCursor.getBufferPosition())
     else
-      range
+      changedRange = sortRanges(newRanges.concat(oldRanges))[0]
 
-  mapToChangedRanges: (list, fn) ->
-    ranges = list.map (e) -> fn(e)
-    mergeIntersectingRanges(ranges).map (r) =>
-      @trimEndOfLineRange(r)
-
-  mutateWithTrackingChanges: (fn) ->
-    markersAdded = []
-    rangesRemoved = []
-
-    disposable = @editor.getBuffer().onDidChange ({oldRange, newRange}) =>
-      # To highlight(decorate) removed range, I don't want marker's auto-tracking-range-change feature.
-      # So here I simply use range for removal
-      rangesRemoved.push(oldRange) unless oldRange.isEmpty()
-      # For added range I want marker's auto-tracking-range-change feature.
-      @saveRangeAsMarker(markersAdded, newRange) unless newRange.isEmpty()
-    @mutate()
-    disposable.dispose()
-
-    # FIXME: this is still not completely accurate and heavy approach.
-    # To accurately track range updated, need to add/remove manually.
-    rangesAdded = @mapToChangedRanges markersAdded, (m) -> m.getBufferRange()
-    markersAdded.forEach (m) -> m.destroy()
-    rangesRemoved = @mapToChangedRanges rangesRemoved, (r) -> r
-
-    firstAdded = rangesAdded[0]
-    lastRemoved = _.last(rangesRemoved)
-    range =
-      if firstAdded? and lastRemoved?
-        if firstAdded.start.isLessThan(lastRemoved.start)
-          firstAdded
-        else
-          lastRemoved
+    if changedRange?
+      if isLinewiseRange(changedRange)
+        setBufferRow(lastCursor, changedRange.start.row)
       else
-        firstAdded or lastRemoved
+        lastCursor.setBufferPosition(changedRange.start)
 
-    fn(range) if range?
-    if settings.get('flashOnUndoRedo')
-      @onDidFinishOperation =>
-        timeout = settings.get('flashOnUndoRedoDuration')
-        highlightRanges @editor, rangesRemoved,
-          class: "vim-mode-plus-flash removed"
-          timeout: timeout
+  mutateWithTrackChanges: ->
+    newRanges = []
+    oldRanges = []
 
-        highlightRanges @editor, rangesAdded,
-          class: "vim-mode-plus-flash added"
-          timeout: timeout
+    # Collect changed range while mutating text-state by fn callback.
+    disposable = @editor.getBuffer().onDidChange ({newRange, oldRange}) ->
+      if newRange.isEmpty()
+        oldRanges.push(oldRange) # Remove only
+      else
+        newRanges.push(newRange)
+
+    @mutate()
+
+    disposable.dispose()
+    {newRanges, oldRanges}
+
+  flashChanges: ({newRanges, oldRanges}) ->
+    isMultipleSingleLineRanges = (ranges) ->
+      ranges.length > 1 and ranges.every(isSingleLineRange)
+
+    if newRanges.length > 0
+      return if @isMultipleAndAllRangeHaveSameColumnRanges(newRanges)
+      newRanges = newRanges.map (range) => humanizeBufferRange(@editor, range)
+      newRanges = @filterNonLeadingWhiteSpaceRange(newRanges)
+
+      if isMultipleSingleLineRanges(newRanges)
+        @flash(newRanges, type: 'undo-redo-multiple-changes')
+      else
+        @flash(newRanges, type: 'undo-redo')
+    else
+      return if @isMultipleAndAllRangeHaveSameColumnRanges(oldRanges)
+
+      if isMultipleSingleLineRanges(oldRanges)
+        oldRanges = @filterNonLeadingWhiteSpaceRange(oldRanges)
+        @flash(oldRanges, type: 'undo-redo-multiple-delete')
+
+  filterNonLeadingWhiteSpaceRange: (ranges) ->
+    ranges.filter (range) =>
+      not isLeadingWhiteSpaceRange(@editor, range)
+
+  isMultipleAndAllRangeHaveSameColumnRanges: (ranges) ->
+    return false if ranges.length <= 1
+
+    {start, end} = ranges[0]
+    startColumn = start.column
+    endColumn = end.column
+
+    ranges.every ({start, end}) ->
+      (start.column is startColumn) and (end.column is endColumn)
+
+  flash: (flashRanges, options) ->
+    options.timeout ?= 500
+    @onDidFinishOperation =>
+      @vimState.flash(flashRanges, options)
 
   execute: ->
-    @mutateWithTrackingChanges ({start, end}) =>
-      @vimState.mark.set('[', start)
-      @vimState.mark.set(']', end)
-      if settings.get('setCursorToStartOfChangeOnUndoRedo')
-        @editor.setCursorBufferPosition(start)
+    {newRanges, oldRanges} = @mutateWithTrackChanges()
 
     for selection in @editor.getSelections()
       selection.clear()
+
+    if @getConfig('setCursorToStartOfChangeOnUndoRedo')
+      strategy = @getConfig('setCursorToStartOfChangeOnUndoRedoStrategy')
+      @setCursorPosition({newRanges, oldRanges, strategy})
+      @vimState.clearSelections()
+
+    if @getConfig('flashOnUndoRedo')
+      @flashChanges({newRanges, oldRanges})
+
     @activateMode('normal')
 
   mutate: ->
@@ -121,7 +151,7 @@ class ReplaceModeBackspace extends MiscCommand
   @commandScope: 'atom-text-editor.vim-mode-plus.insert-mode.replace'
   @extend()
   execute: ->
-    @editor.getSelections().forEach (selection) =>
+    for selection in @editor.getSelections()
       # char might be empty.
       char = @vimState.modeManager.getReplacedCharForSelection(selection)
       if char?
@@ -129,15 +159,7 @@ class ReplaceModeBackspace extends MiscCommand
         unless selection.insertText(char).isEmpty()
           selection.cursor.moveLeft()
 
-class MaximizePane extends MiscCommand
-  @extend()
-  execute: ->
-    selector = 'vim-mode-plus-pane-maximized'
-    workspaceElement = atom.views.getView(atom.workspace)
-    workspaceElement.classList.toggle(selector)
-
-# [FIXME] Name Scroll is misleading, AdjustVisibleArea is more explicit.
-class Scroll extends MiscCommand
+class ScrollWithoutChangingCursorPosition extends MiscCommand
   @extend(false)
   scrolloff: 2 # atom default. Better to use editor.getVerticalScrollMargin()?
   cursorPixel: null
@@ -156,36 +178,40 @@ class Scroll extends MiscCommand
     @editorElement.pixelPositionForScreenPosition(point)
 
 # ctrl-e scroll lines downwards
-class ScrollDown extends Scroll
+class ScrollDown extends ScrollWithoutChangingCursorPosition
   @extend()
-  direction: 'down'
 
   execute: ->
-    amountInPixel = @editor.getLineHeightInPixels() * @getCount()
-    scrollTop = @editorElement.getScrollTop()
-    switch @direction
-      when 'down' then scrollTop += amountInPixel
-      when 'up'   then scrollTop -= amountInPixel
-    @editorElement.setScrollTop scrollTop
-    @keepCursorOnScreen?()
+    count = @getCount()
+    oldFirstRow = @editor.getFirstVisibleScreenRow()
+    @editor.setFirstVisibleScreenRow(oldFirstRow + count)
+    newFirstRow = @editor.getFirstVisibleScreenRow()
 
-  keepCursorOnScreen: ->
+    margin = @editor.getVerticalScrollMargin()
     {row, column} = @editor.getCursorScreenPosition()
-    newRow =
-      if row < (rowMin = @getFirstVisibleScreenRow() + @scrolloff)
-        rowMin
-      else if row > (rowMax = @getLastVisibleScreenRow() - (@scrolloff + 1))
-        rowMax
-    @editor.setCursorScreenPosition [newRow, column] if newRow?
+    if row < (newFirstRow + margin)
+      newPoint = [row + count, column]
+      @editor.setCursorScreenPosition(newPoint, autoscroll: false)
 
 # ctrl-y scroll lines upwards
-class ScrollUp extends ScrollDown
+class ScrollUp extends ScrollWithoutChangingCursorPosition
   @extend()
-  direction: 'up'
 
-# Scroll without Cursor Position change.
+  execute: ->
+    count = @getCount()
+    oldFirstRow = @editor.getFirstVisibleScreenRow()
+    @editor.setFirstVisibleScreenRow(oldFirstRow - count)
+    newLastRow = @editor.getLastVisibleScreenRow()
+
+    margin = @editor.getVerticalScrollMargin()
+    {row, column} = @editor.getCursorScreenPosition()
+    if row >= (newLastRow - margin)
+      newPoint = [row - count, column]
+      @editor.setCursorScreenPosition(newPoint, autoscroll: false)
+
+# ScrollWithoutChangingCursorPosition without Cursor Position change.
 # -------------------------
-class ScrollCursor extends Scroll
+class ScrollCursor extends ScrollWithoutChangingCursorPosition
   @extend(false)
   execute: ->
     @moveToFirstCharacterOfLine?()
@@ -240,10 +266,10 @@ class ScrollCursorToMiddleLeave extends ScrollCursorToMiddle
   @extend()
   moveToFirstCharacterOfLine: null
 
-# Horizontal Scroll
+# Horizontal ScrollWithoutChangingCursorPosition
 # -------------------------
 # zs
-class ScrollCursorToLeft extends Scroll
+class ScrollCursorToLeft extends ScrollWithoutChangingCursorPosition
   @extend()
 
   execute: ->
@@ -255,3 +281,18 @@ class ScrollCursorToRight extends ScrollCursorToLeft
 
   execute: ->
     @editorElement.setScrollRight(@getCursorPixel().left)
+
+class ActivateNormalModeOnce extends MiscCommand
+  @extend()
+  @commandScope: 'atom-text-editor.vim-mode-plus.insert-mode'
+  thisCommandName: @getCommandName()
+
+  execute: ->
+    cursorsToMoveRight = @editor.getCursors().filter (cursor) -> not cursor.isAtBeginningOfLine()
+    @vimState.activate('normal')
+    moveCursorRight(cursor) for cursor in cursorsToMoveRight
+    disposable = atom.commands.onDidDispatch ({type}) =>
+      return if type is @thisCommandName
+      disposable.dispose()
+      disposable = null
+      @vimState.activate('insert')

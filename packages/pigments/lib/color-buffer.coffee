@@ -1,14 +1,15 @@
-fs = require 'fs'
-{Emitter, CompositeDisposable, Task, Range} = require 'atom'
-Color = require './color'
-ColorMarker = require './color-marker'
-ColorExpression = require './color-expression'
-VariablesCollection = require './variables-collection'
-scopeFromFileName = require './scope-from-file-name'
+[
+  Color, ColorMarker, VariablesCollection,
+  Emitter, CompositeDisposable, Task, Range,
+  fs
+] = []
 
 module.exports =
 class ColorBuffer
   constructor: (params={}) ->
+    unless Emitter?
+      {Emitter, CompositeDisposable, Task, Range} = require 'atom'
+
     {@editor, @project, colorMarkers} = params
     {@id} = @editor
     @emitter = new Emitter
@@ -47,6 +48,8 @@ class ColorBuffer
       @update()
 
     if @project.getPaths()? and @isVariablesSource() and !@project.hasPath(@editor.getPath())
+      fs ?= require 'fs'
+
       if fs.existsSync(@editor.getPath())
         @project.appendPath(@editor.getPath())
       else
@@ -69,7 +72,6 @@ class ColorBuffer
 
     if @editor.addMarkerLayer?
       @markerLayer = @editor.addMarkerLayer()
-      @editor.findMarkers(type: 'pigments-color').forEach (m) -> m.destroy()
     else
       @markerLayer = @editor
 
@@ -103,15 +105,15 @@ class ColorBuffer
     @initializePromise
 
   restoreMarkersState: (colorMarkers) ->
+    Color ?= require './color'
+    ColorMarker ?= require './color-marker'
+
     @updateVariableRanges()
 
     @colorMarkers = colorMarkers
     .filter (state) -> state?
     .map (state) =>
-      marker = @editor.getMarker(state.markerId) ? @markerLayer.markBufferRange(state.bufferRange, {
-        type: 'pigments-color'
-        invalidate: 'touch'
-      })
+      marker = @editor.getMarker(state.markerId) ? @markerLayer.markBufferRange(state.bufferRange, { invalidate: 'touch' })
       color = new Color(state.color)
       color.variables = state.variables
       color.invalid = state.invalid
@@ -123,7 +125,7 @@ class ColorBuffer
       }
 
   cleanUnusedTextEditorMarkers: ->
-    @markerLayer.findMarkers(type: 'pigments-color').forEach (m) =>
+    @markerLayer.findMarkers().forEach (m) =>
       m.destroy() unless @colorMarkersByMarkerId[m.id]?
 
   variablesAvailable: ->
@@ -183,6 +185,8 @@ class ColorBuffer
 
   getPath: -> @editor.getPath()
 
+  getScope: -> @project.scopeFromFileName(@getPath())
+
   updateIgnoredScopes: ->
     @ignoredScopes = @project.getIgnoredScopes().map (scope) ->
       try new RegExp(scope)
@@ -219,7 +223,7 @@ class ColorBuffer
     config =
       buffer: @editor.getText()
       registry: @project.getVariableExpressionsRegistry().serialize()
-      scope: scopeFromFileName(@editor.getPath())
+      scope: @getScope()
 
     new Promise (resolve, reject) =>
       @task = Task.once(
@@ -264,7 +268,6 @@ class ColorBuffer
 
   getColorMarkerAtBufferPosition: (bufferPosition) ->
     markers = @markerLayer.findMarkers({
-      type: 'pigments-color'
       containsBufferPosition: bufferPosition
     })
 
@@ -274,6 +277,8 @@ class ColorBuffer
 
   createColorMarkers: (results) ->
     return Promise.resolve([]) if @destroyed
+
+    ColorMarker ?= require './color-marker'
 
     new Promise (resolve, reject) =>
       newResults = []
@@ -286,10 +291,7 @@ class ColorBuffer
         while results.length
           result = results.shift()
 
-          marker = @markerLayer.markBufferRange(result.bufferRange, {
-            type: 'pigments-color'
-            invalidate: 'touch'
-          })
+          marker = @markerLayer.markBufferRange(result.bufferRange, {invalidate: 'touch'})
           newResults.push @colorMarkersByMarkerId[marker.id] = new ColorMarker {
             marker
             color: result.color
@@ -360,7 +362,6 @@ class ColorBuffer
       return marker if marker?.match(properties)
 
   findColorMarkers: (properties={}) ->
-    properties.type = 'pigments-color'
     markers = @markerLayer.findMarkers(properties)
     markers.map (marker) =>
       @colorMarkersByMarkerId[marker.id]
@@ -382,15 +383,19 @@ class ColorBuffer
     if @project.colorPickerAPI?
       @project.colorPickerAPI.open(@editor, @editor.getLastCursor())
 
-
   scanBufferForColors: (options={}) ->
     return Promise.reject("This ColorBuffer is already destroyed") if @destroyed
+
+    Color ?= require './color'
+
     results = []
     taskPath = require.resolve('./tasks/scan-buffer-colors-handler')
     buffer = @editor.getBuffer()
     registry = @project.getColorExpressionsRegistry().serialize()
 
     if options.variables?
+      VariablesCollection ?= require './variables-collection'
+
       collection = new VariablesCollection()
       collection.addMany(options.variables)
       options.variables = collection
@@ -411,6 +416,7 @@ class ColorBuffer
     config =
       buffer: @editor.getText()
       bufferPath: @getPath()
+      scope: @getScope()
       variables: variables
       colorVariables: variables.filter (v) -> v.isColor
       registry: registry

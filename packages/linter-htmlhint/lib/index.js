@@ -1,78 +1,80 @@
 'use babel';
 
-import * as path from 'path';
-import { execNode, find, rangeFromLineNumber } from 'atom-linter';
+// eslint-disable-next-line import/extensions, import/no-extraneous-dependencies
+import { CompositeDisposable } from 'atom';
+import { readFile as fsReadFile } from 'fs';
+import { dirname } from 'path';
 
-const GRAMMAR_SCOPES = [
-  'text.html.angular',
-  'text.html.basic',
-  'text.html.erb',
-  'text.html.gohtml',
-  'text.html.jsp',
-  'text.html.mustache',
-  'text.html.handlebars',
-  'text.html.ruby'
-];
+const lazyReq = require('lazy-req')(require);
 
-export const config = {
-  executablePath: {
-    title: 'Executable Path',
-    description: 'HTMLHint Node Script Path',
-    type: 'string',
-    default: path.join(__dirname, '..', 'node_modules', 'htmlhint', 'bin', 'htmlhint')
-  }
-};
+const { findAsync, generateRange } = lazyReq('atom-linter')('findAsync', 'generateRange');
+const stripJSONComments = lazyReq('strip-json-comments');
+const tinyPromisify = lazyReq('tiny-promisify');
 
-let executablePath = '';
+const grammarScopes = [];
+
+let subscriptions;
 
 export function activate() {
   require('atom-package-deps').install('linter-htmlhint');
 
-  executablePath = atom.config.get('linter-htmlhint.executablePath');
-
-  atom.config.observe('linter-htmlhint.executablePath', newValue => {
-    executablePath = newValue;
-  });
+  subscriptions = new CompositeDisposable();
+  subscriptions.add(atom.config.observe('linter-htmlhint.enabledScopes', (scopes) => {
+    // Remove any old scopes
+    grammarScopes.splice(0, grammarScopes.length);
+    // Add the current scopes
+    Array.prototype.push.apply(grammarScopes, scopes);
+  }));
 }
+
+export function deactivate() {
+  subscriptions.dispose();
+}
+
+const getConfig = async (filePath) => {
+  const readFile = tinyPromisify()(fsReadFile);
+  const configPath = await findAsync(dirname(filePath), '.htmlhintrc');
+  let conf = null;
+  if (configPath !== null) {
+    conf = await readFile(configPath, 'utf8');
+  }
+  if (conf) {
+    return JSON.parse(stripJSONComments()(conf));
+  }
+  return null;
+};
 
 export function provideLinter() {
   return {
     name: 'htmlhint',
-    grammarScopes: GRAMMAR_SCOPES,
+    grammarScopes,
     scope: 'file',
-    lintOnFly: false,
-    lint: editor => {
-      const text = editor.getText();
+    lintOnFly: true,
+    lint: async (editor) => {
+      const { HTMLHint } = require('htmlhint');
+
+      const fileText = editor.getText();
       const filePath = editor.getPath();
 
-      if (!text) {
-        return Promise.resolve([]);
+      if (!fileText) {
+        return [];
       }
 
-      const parameters = [filePath, '--format', 'json'];
-      const htmlhintrc = find(path.dirname(filePath), '.htmlhintrc');
+      const ruleset = await getConfig(filePath);
 
-      if (htmlhintrc) {
-        parameters.push('-c');
-        parameters.push(htmlhintrc);
+      const messages = HTMLHint.verify(fileText, ruleset || undefined);
+
+      if (editor.getText() !== fileText) {
+        // Editor contents have changed, tell Linter not to update
+        return null;
       }
 
-      return execNode(executablePath, parameters, {}).then(output => {
-        const results = JSON.parse(output);
-
-        if (!results.length) {
-          return [];
-        }
-
-        const messages = results[0].messages;
-
-        return messages.map(message => ({
-          range: rangeFromLineNumber(editor, message.line - 1, message.col - 1),
-          type: message.type,
-          text: message.message,
-          filePath
-        }));
-      });
+      return messages.map(message => ({
+        range: generateRange(editor, message.line - 1, message.col - 1),
+        type: message.type,
+        text: message.message,
+        filePath
+      }));
     }
   };
 }

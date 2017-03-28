@@ -1,40 +1,37 @@
 _ = require 'underscore-plus'
-globalState = require './global-state'
-settings = require './settings'
 
 module.exports =
 class SearchHistoryManager
   idx: null
 
   constructor: (@vimState) ->
+    {@globalState} = @vimState
     @idx = -1
 
   get: (direction) ->
     switch direction
       when 'prev' then @idx += 1 unless (@idx + 1) is @getSize()
       when 'next' then @idx -= 1 unless (@idx is -1)
-    globalState.searchHistory[@idx] ? ''
+    @globalState.get('searchHistory')[@idx] ? ''
 
   save: (entry) ->
     return if _.isEmpty(entry)
-    @replaceEntries _.uniq([entry].concat @getEntries())
-    if @getSize() > settings.get('historySize')
-      @getEntries().splice settings.get('historySize')
+
+    entries = @globalState.get('searchHistory').slice()
+    entries.unshift(entry)
+    entries = _.uniq(entries)
+    if @getSize() > @vimState.getConfig('historySize')
+      entries.splice(@vimState.getConfig('historySize'))
+    @globalState.set('searchHistory', entries)
 
   reset: ->
     @idx = -1
 
   clear: ->
-    @replaceEntries []
+    @globalState.reset('searchHistory')
 
   getSize: ->
-    @getEntries().length
-
-  getEntries: ->
-    globalState.searchHistory
-
-  replaceEntries: (entries) ->
-    globalState.searchHistory = entries
+    @globalState.get('searchHistory').length
 
   destroy: ->
     @idx = null

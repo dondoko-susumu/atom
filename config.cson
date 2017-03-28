@@ -55,28 +55,88 @@
     xml: {}
     xtemplate: {}
   core:
+    customFileTypes:
+      "source.ini": [
+        ".buckconfig"
+        ".flowconfig"
+        ".hgrc"
+      ]
+      "source.json": [
+        ".arcconfig"
+        "BUCK.autodeps"
+      ]
+      "source.python": [
+        "BUCK"
+      ]
     disabledPackages: [
       "wrap-guide"
-      "vim-mode-plus"
+      "language-babel"
+      "paner"
     ]
+    telemetryConsent: "limited"
     themes: [
       "atom-dark-ui"
       "atom-dark-syntax"
     ]
   editor:
     fontFamily: "\"Ricty\""
-    fontSize: 19
+    fontSize: 16
     invisibles: {}
     lineHeight: 1.2
     showIndentGuide: true
     showInvisibles: true
   "exception-reporting":
     userId: "81481ca1-a40d-cbe8-c8a5-025f76f1e8fa"
-  "git-plus": {}
+  "git-plus":
+    general: {}
+  "go-plus":
+    config:
+      gopath: "~/.go"
+    format:
+      tool: "gofmt"
+    lint:
+      args: [
+        "--vendor"
+        "--disable-all"
+        "--enable=vet"
+        "--enable=vetshadow"
+        "--enable=golint"
+        "--enable=ineffassign"
+        "--enable=goconst"
+        "--tests"
+        "--json"
+        "--errors"
+        "."
+      ]
   "japanese-wrap":
     characterWidth: {}
-  linter:
-    showErrorPanel: false
+  "js-hyperclick":
+    jumpToImport: true
+  linter: {}
+  "linter-ui-default":
+    showPanel: true
+  minimap:
+    plugins:
+      "find-and-replace": true
+      "find-and-replaceDecorationsZIndex": 0
+      "git-diff": true
+      "git-diffDecorationsZIndex": 0
+      "highlight-selected": true
+      "highlight-selectedDecorationsZIndex": 0
+  nuclide:
+    "nuclide-file-tree":
+      hideIgnoredNames: false
+    "nuclide-flow":
+      warnOnNotInstalled: false
+    "nuclide-home":
+      showHome: false
+    "nuclide-outline-view":
+      nameOnly: true
+    "nuclide-react-native": {}
+    "nuclide-swift": {}
+    use:
+      "nuclide-file-tree": false
+  "tree-view": {}
   "vim-mode-plus": {}
   welcome:
     showOnStartup: false

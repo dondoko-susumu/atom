@@ -1,52 +1,89 @@
 _ = require 'underscore-plus'
 Delegato = require 'delegato'
 {CompositeDisposable} = require 'atom'
-
-settings = require './settings'
-selectList = null # delay
+{
+  getVimEofBufferPosition
+  getVimLastBufferRow
+  getVimLastScreenRow
+  getWordBufferRangeAndKindAtBufferPosition
+  getFirstCharacterPositionForBufferRow
+  getBufferRangeForRowRange
+  getIndentLevelForBufferRow
+  scanEditorInDirection
+} = require './utils'
+swrap = require './selection-wrapper'
+Input = require './input'
+selectList = null
 getEditorState = null # set by Base.init()
+{OperationAbortedError} = require './errors'
 
 vimStateMethods = [
-  "onDidChangeInput"
-  "onDidConfirmInput"
-  "onDidCancelInput"
-  "onDidUnfocusInput"
-  "onDidCommandInput"
+  "assert"
+  "assertWithException"
   "onDidChangeSearch"
   "onDidConfirmSearch"
   "onDidCancelSearch"
-  "onDidUnfocusSearch"
   "onDidCommandSearch"
-  "onWillSelectTarget"
-  "onDidSelectTarget"
+
+  # Life cycle
   "onDidSetTarget"
+  "emitDidSetTarget"
+      "onWillSelectTarget"
+      "emitWillSelectTarget"
+      "onDidSelectTarget"
+      "emitDidSelectTarget"
+
+      "onDidFailSelectTarget"
+      "emitDidFailSelectTarget"
+
+      "onDidRestoreCursorPositions"
+      "emitDidRestoreCursorPositions"
+    "onWillFinishMutation"
+    "emitWillFinishMutation"
+    "onDidFinishMutation"
+    "emitDidFinishMutation"
   "onDidFinishOperation"
+  "onDidResetOperationStack"
+
+  "onDidSetOperatorModifier"
+
+  "onWillActivateMode"
+  "onDidActivateMode"
+  "preemptWillDeactivateMode"
+  "onWillDeactivateMode"
+  "onDidDeactivateMode"
+
   "onDidCancelSelectList"
   "subscribe"
   "isMode"
-  "hasCount"
   "getBlockwiseSelections"
-  "updateSelectionProperties"
+  "getLastBlockwiseSelection"
+  "addToClassList"
+  "getConfig"
 ]
 
 class Base
   Delegato.includeInto(this)
-  @delegatesMethods vimStateMethods..., toProperty: 'vimState'
+  @delegatesMethods(vimStateMethods..., toProperty: 'vimState')
+  @delegatesProperty('mode', 'submode', toProperty: 'vimState')
 
-  constructor: (@vimState, properties) ->
-    {@editor, @editorElement} = @vimState
-    @vimState.hover.setPoint()
-    if hover = @hover?[settings.get('showHoverOnOperateIcon')]
-      @addHover(hover)
-    _.extend(this, properties)
+  constructor: (@vimState, properties=null) ->
+    {@editor, @editorElement, @globalState} = @vimState
+    _.extend(this, properties) if properties?
+
+  # To override
+  initialize: ->
 
   # Operation processor execute only when isComplete() return true.
   # If false, operation processor postpone its execution.
   isComplete: ->
-    if (@isRequireInput() and not @hasInput())
+    if @isRequireInput() and not @hasInput()
       false
     else if @isRequireTarget()
-      @getTarget()?.isComplete()
+      # When this function is called in Base::constructor
+      # tagert is still string like `MoveToRight`, in this case isComplete
+      # is not available.
+      @getTarget()?.isComplete?()
     else
       true
 
@@ -69,51 +106,66 @@ class Base
 
   # Intended to be used by TextObject or Motion
   operator: null
-  hasOperator: -> @operator?
   getOperator: -> @operator
   setOperator: (@operator) -> @operator
-  isAsOperatorTarget: ->
-    @hasOperator() and not @getOperator().instanceof('Select')
+  isAsTargetExceptSelect: ->
+    @operator? and not @operator.instanceof('Select')
 
   abort: ->
-    throw new OperationAbortedError()
+    throw new OperationAbortedError('aborted')
 
   # Count
   # -------------------------
+  count: null
   defaultCount: 1
-  getDefaultCount: ->
-    @defaultCount
+  getCount: (offset=0) ->
+    @count ?= @vimState.getCount() ? @defaultCount
+    @count + offset
 
-  getCount: ->
-    # Setting count as instance variable allows operation repeatable with same count.
-    @count ?= @vimState.getCount() ? @getDefaultCount()
+  resetCount: ->
+    @count = null
 
   isDefaultCount: ->
-    # Don't call getCount() since its has side-effect to update @count to cache.
-    @count is @getDefaultCount()
+    @count is @defaultCount
 
   # Misc
   # -------------------------
-  countTimes: (fn) ->
-    count = @getCount()
-    _.times count, (i) ->
-      isFinal = (num = i + 1) is count
-      fn(num,  isFinal)
+  countTimes: (last, fn) ->
+    return if last < 1
+
+    stopped = false
+    stop = -> stopped = true
+    for count in [1..last]
+      isFinal = count is last
+      fn({count, isFinal, stop})
+      break if stopped
 
   activateMode: (mode, submode) ->
     @onDidFinishOperation =>
       @vimState.activate(mode, submode)
 
-  addHover: (text, {replace}={}) ->
-    if settings.get('showHoverOnOperate')
-      if replace ? false
-        @vimState.hover.replaceLastSection(text)
-      else
-        @vimState.hover.add(text)
+  activateModeIfNecessary: (mode, submode) ->
+    unless @vimState.isMode(mode, submode)
+      @activateMode(mode, submode)
 
-  new: (name, properties={}) ->
+  new: (name, properties) ->
     klass = Base.getClass(name)
     new klass(@vimState, properties)
+
+  newInputUI: ->
+    new Input(@vimState)
+
+  # FIXME: This is used to clone Motion::Search to support `n` and `N`
+  # But manual reseting and overriding property is bug prone.
+  # Should extract as search spec object and use it by
+  # creating clean instance of Search.
+  clone: (vimState) ->
+    properties = {}
+    excludeProperties = ['editor', 'editorElement', 'globalState', 'vimState', 'operator']
+    for own key, value of this when key not in excludeProperties
+      properties[key] = value
+    klass = this.constructor
+    new klass(vimState, properties)
 
   cancelOperation: ->
     @vimState.operationStack.cancel()
@@ -131,25 +183,50 @@ class Base
   hasInput: -> @input?
   getInput: -> @input
 
-  focusInput: (options={}) ->
-    options.charsMax ?= 1
-    @onDidConfirmInput (@input) =>
+  focusInput: (charsMax) ->
+    inputUI = @newInputUI()
+    inputUI.onDidConfirm (@input) =>
       @processOperation()
 
-    # From 2nd addHover, we replace last section of hover
-    # to sync content with input mini editor.
-    replace = false
-    @onDidChangeInput (input) =>
-      @addHover(input, {replace})
-      replace = true
+    if charsMax > 1
+      inputUI.onDidChange (input) =>
+        @vimState.hover.set(input)
 
-    @onDidCancelInput =>
-      @cancelOperation()
+    inputUI.onDidCancel(@cancelOperation.bind(this))
+    inputUI.focus(charsMax)
 
-    @vimState.input.focus(options)
+  getVimEofBufferPosition: ->
+    getVimEofBufferPosition(@editor)
+
+  getVimLastBufferRow: ->
+    getVimLastBufferRow(@editor)
+
+  getVimLastScreenRow: ->
+    getVimLastScreenRow(@editor)
+
+  getWordBufferRangeAndKindAtBufferPosition: (point, options) ->
+    getWordBufferRangeAndKindAtBufferPosition(@editor, point, options)
+
+  getFirstCharacterPositionForBufferRow: (row) ->
+    getFirstCharacterPositionForBufferRow(@editor, row)
+
+  getBufferRangeForRowRange: (rowRange) ->
+    getBufferRangeForRowRange(@editor, rowRange)
+
+  getIndentLevelForBufferRow: (row) ->
+    getIndentLevelForBufferRow(@editor, row)
+
+  scanForward: (args...) ->
+    scanEditorInDirection(@editor, 'forward', args...)
+
+  scanBackward: (args...) ->
+    scanEditorInDirection(@editor, 'backward', args...)
 
   instanceof: (klassName) ->
     this instanceof Base.getClass(klassName)
+
+  is: (klassName) ->
+    this.constructor is Base.getClass(klassName)
 
   isOperator: ->
     @instanceof('Operator')
@@ -163,19 +240,35 @@ class Base
   getName: ->
     @constructor.name
 
+  getCursorBufferPosition: ->
+    if @mode is 'visual'
+      @getCursorPositionForSelection(@editor.getLastSelection())
+    else
+      @editor.getCursorBufferPosition()
+
+  getCursorBufferPositions: ->
+    if @mode is 'visual'
+      @editor.getSelections().map(@getCursorPositionForSelection.bind(this))
+    else
+      @editor.getCursorBufferPositions()
+
+  getBufferPositionForCursor: (cursor) ->
+    if @mode is 'visual'
+      @getCursorPositionForSelection(cursor.selection)
+    else
+      cursor.getBufferPosition()
+
+  getCursorPositionForSelection: (selection) ->
+    swrap(selection).getBufferPositionFor('head', from: ['property', 'selection'])
+
   toString: ->
     str = @getName()
-    str += ", target=#{@getTarget().toString()}" if @hasTarget()
-    str
-
-  emitWillSelectTarget: ->
-    @vimState.emitter.emit 'will-select-target'
-
-  emitDidSelectTarget: ->
-    @vimState.emitter.emit 'did-select-target'
-
-  emitDidSetTarget: (operator) ->
-    @vimState.emitter.emit 'did-set-target', operator
+    if @hasTarget()
+      str += ", target=#{@target.getName()}, target.wise=#{@target.wise} "
+    else if @operator?
+      str += ", wise=#{@wise} , operator=#{@operator.getName()}"
+    else
+      str
 
   # Class methods
   # -------------------------
@@ -183,12 +276,15 @@ class Base
     {getEditorState} = service
     @subscriptions = new CompositeDisposable()
 
-    require(lib) for lib in [
-      './operator', './motion', './text-object',
+    [
+      './operator', './operator-insert', './operator-transform-string',
+      './motion', './motion-search',
+      './text-object',
       './insert-mode', './misc-command'
-    ]
+    ].forEach(require)
+
     for __, klass of @getRegistries() when klass.isCommand()
-      @subscriptions.add klass.registerCommand()
+      @subscriptions.add(klass.registerCommand())
     @subscriptions
 
   # For development easiness without reloading vim-mode-plus
@@ -196,16 +292,16 @@ class Base
     @subscriptions.dispose()
     @subscriptions = new CompositeDisposable()
     for __, klass of @getRegistries() when klass.isCommand()
-      @subscriptions.add klass.registerCommand()
+      @subscriptions.add(klass.registerCommand())
 
   registries = {Base}
   @extend: (@command=true) ->
-    if (name of registries) and (not @suppressWarning)
-      console.warn "Duplicate constructor #{@name}"
+    if (@name of registries) and (not @suppressWarning)
+      console.warn("Duplicate constructor #{@name}")
     registries[@name] = this
 
   @getClass: (name) ->
-    if klass = registries[name]
+    if (klass = registries[name])?
       klass
     else
       throw new Error("class '#{name}' not found")
@@ -227,7 +323,6 @@ class Base
   @getCommandScope: ->
     @commandScope
 
-  @description
   @getDesctiption: ->
     if @hasOwnProperty("description")
       @description
@@ -235,16 +330,12 @@ class Base
       null
 
   @registerCommand: ->
-    atom.commands.add(@getCommandScope(), @getCommandName(), => @run())
-
-  @run: ->
-    if vimState = getEditorState(atom.workspace.getActiveTextEditor())
-      # Reason: https://github.com/t9md/atom-vim-mode-plus/issues/85
-      vimState.operationStack.run(this)
-
-class OperationAbortedError extends Base
-  @extend(false)
-  constructor: (@message) ->
-    @name = 'OperationAborted Error'
+    klass = this
+    atom.commands.add @getCommandScope(), @getCommandName(), (event) ->
+      vimState = getEditorState(@getModel()) ? getEditorState(atom.workspace.getActiveTextEditor())
+      if vimState? # Possibly undefined See #85
+        vimState._event = event
+        vimState.operationStack.run(klass)
+      event.stopPropagation()
 
 module.exports = Base

@@ -1,5 +1,73 @@
 # Changelog
 
+## v8.1.4
+
+*   Improve package.json eslintConfig support ([#848](https://github.com/AtomLinter/linter-eslint/pull/848))
+
+## v8.1.3
+
+*   Log the file scope in debug command ([#835](https://github.com/AtomLinter/linter-eslint/pull/835))
+*   Don't specify rulesDir if not found ([#843](https://github.com/AtomLinter/linter-eslint/pull/843))
+*   Update specs for ESLint v3.17.0 ([#844](https://github.com/AtomLinter/linter-eslint/pull/844))
+
+## v8.1.2
+
+*   Update `atom-linter` bringing in a fix for #765 ([#817](https://github.com/AtomLinter/linter-eslint/pull/817))
+
+## v8.1.1
+
+*   Exclude `.babelrc` from releases ([#809](https://github.com/AtomLinter/linter-eslint/pull/809))
+*   Use cursor scope instead of file when checking fix-on-save ([#811](https://github.com/AtomLinter/linter-eslint/pull/811))
+*   Handle undefined package path ([#812](https://github.com/AtomLinter/linter-eslint/pull/812))
+*   Temporarily disable an intermittent spec ([#813](https://github.com/AtomLinter/linter-eslint/pull/813))
+*   Remove custom styling on rules ([#814](https://github.com/AtomLinter/linter-eslint/pull/814))
+
+## v8.1.0
+
+*   Handle invalid points gracefully ([#761](https://github.com/AtomLinter/linter-eslint/pull/761))
+*   Warn on partial fixes ([#777](https://github.com/AtomLinter/linter-eslint/pull/777))
+*   Ignore `~/.eslintrc` when determining `disableWhenNoEslintConfig` status ([#778](https://github.com/AtomLinter/linter-eslint/pull/778))
+*   Allow rules to be excluded from fix runs ([#795](https://github.com/AtomLinter/linter-eslint/pull/795))
+
+
+## v8.0.0
+
+*   Update ESLint to v3.5.0 ([#692](https://github.com/AtomLinter/linter-eslint/pull/692))
+*   Add setting for rules to silence while typing ([#666](https://github.com/AtomLinter/linter-eslint/pull/666))
+*   Update ESLint to v3.6.0 ([#713](https://github.com/AtomLinter/linter-eslint/pull/713))
+*   Add a debug information command ([#730](https://github.com/AtomLinter/linter-eslint/pull/730))
+*   Add support for `endLine` and `endColumn` in ESLint messages ([#709](https://github.com/AtomLinter/linter-eslint/pull/709))
+
+## v7.3.2
+
+*   Fix a race condition with modified editor text ([#703](https://github.com/AtomLinter/linter-eslint/pull/703))
+
+## v7.3.1
+
+*   Throw original error for invalid ranges ([#694](https://github.com/AtomLinter/linter-eslint/pull/694))
+
+## v7.3.0
+
+*   Fix sending `null` to `path.dirname()` for future Electron compatibility ([#673](https://github.com/AtomLinter/linter-eslint/pull/673))
+*   Use `eslint-rule-documentation` to get help URL's for rules ([#657](https://github.com/AtomLinter/linter-eslint/pull/657))
+*   Correctly ignore the messages from ESLint about ignored files ([#670](https://github.com/AtomLinter/linter-eslint/pull/670))
+*   Make the scopes linter-eslint runs on configurable ([#629](https://github.com/AtomLinter/linter-eslint/pull/629))
+*   Move configuration to the `package.json` ([#619](https://github.com/AtomLinter/linter-eslint/pull/619))
+
+## v7.2.4
+
+*   Bump minimum Atom version to v1.8.0
+
+## v7.2.3
+
+*   Clarified `disableEslintIgnore` description ([#569](https://github.com/AtomLinter/linter-eslint/pull/569))
+*   Update `eslint-plugin-ava` link ([#589](https://github.com/AtomLinter/linter-eslint/pull/589))
+*   Update ignore message for `eslint@2.11.1` ([#593](https://github.com/AtomLinter/linter-eslint/pull/593))
+
+## v7.2.2
+
+*   Add links for several plugin's rules ([#562](https://github.com/AtomLinter/linter-eslint/pull/562))
+
 ## v7.2.1
 
 *   Only run Fix on Save on supported file types ([#545](https://github.com/AtomLinter/linter-eslint/pull/545))

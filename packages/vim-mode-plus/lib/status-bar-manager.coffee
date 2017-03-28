@@ -1,30 +1,38 @@
-{ElementBuilder} = require './utils'
+_ = require 'underscore-plus'
+settings = require './settings'
 
-modeToContent =
-  "normal": "Normal"
-  'insert': "Insert"
-  'insert.replace': "Replace"
-  'visual': "Visual"
-  "visual.characterwise": "Visual Char"
-  "visual.linewise": "Visual Line"
-  'visual.blockwise': "Visual Block"
+createDiv = ({id, classList}) ->
+  div = document.createElement('div')
+  div.id = id if id?
+  div.classList.add(classList...) if classList?
+  div
 
 module.exports =
 class StatusBarManager
-  ElementBuilder.includeInto(this)
   prefix: 'status-bar-vim-mode-plus'
 
   constructor: ->
-    @container = @div(id: "#{@prefix}-container", classList: ['inline-block'])
-    @container.appendChild(@element = @div(id: @prefix))
+    @container = createDiv(id: "#{@prefix}-container", classList: ['inline-block'])
+    @container.appendChild(@element = createDiv(id: @prefix))
 
   initialize: (@statusBar) ->
 
   update: (mode, submode) ->
-    modeString = mode
-    modeString += "." + submode if submode?
     @element.className = "#{@prefix}-#{mode}"
-    @element.textContent = modeToContent[modeString]
+    @element.textContent =
+      switch settings.get('statusBarModeStringStyle')
+        when 'short'
+          @getShortModeString(mode, submode)
+        when 'long'
+          @getLongModeString(mode, submode)
+
+  getShortModeString: (mode, submode) ->
+    (mode[0] + (if submode? then submode[0] else '')).toUpperCase()
+
+  getLongModeString: (mode, submode) ->
+    modeString = _.humanizeEventName(mode)
+    modeString += " " + _.humanizeEventName(submode) if submode?
+    modeString
 
   attach: ->
     @tile = @statusBar.addRightTile(item: @container, priority: 20)

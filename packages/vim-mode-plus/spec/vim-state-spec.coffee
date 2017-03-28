@@ -1,5 +1,5 @@
 _ = require 'underscore-plus'
-{getVimState, TextData} = require './spec-helper'
+{getVimState, TextData, withMockPlatform} = require './spec-helper'
 settings = require '../lib/settings'
 
 describe "VimState", ->
@@ -12,7 +12,7 @@ describe "VimState", ->
       {set, ensure, keystroke} = vim
 
   beforeEach ->
-    vimState.activate('reset')
+    vimState.resetNormalMode()
 
   describe "initialization", ->
     it "puts the editor in normal-mode initially by default", ->
@@ -66,7 +66,7 @@ describe "VimState", ->
 
       describe "the ctrl-c keybinding", ->
         beforeEach ->
-          keystroke {ctrl: 'c'}
+          keystroke 'ctrl-c'
 
         it "clears the operator stack", ->
           expect(vimState.operationStack.isEmpty()).toBe(true)
@@ -108,7 +108,7 @@ describe "VimState", ->
     describe "the ctrl-v keybinding", ->
       it "puts the editor into visual blockwise mode", ->
         set text: "012345\n\nabcdef", cursor: [0, 0]
-        ensure [ctrl: 'v'], mode: ['visual', 'blockwise']
+        ensure 'ctrl-v', mode: ['visual', 'blockwise']
 
     describe "selecting text", ->
       beforeEach ->
@@ -162,13 +162,30 @@ describe "VimState", ->
         set text: '012345\nabcdef'
 
       it 'properly clears the operations', ->
-        ensure 'dr',
-          mode: 'normal'
+
+        ensure 'd', mode: 'operator-pending'
+        expect(vimState.operationStack.isEmpty()).toBe(false)
+        ensure 'r', mode: 'normal'
         expect(vimState.operationStack.isEmpty()).toBe(true)
-        target = vimState.input.editorElement
-        keystroke 'd'
-        atom.commands.dispatch(target, 'core:cancel')
-        ensure text: '012345\nabcdef'
+
+        ensure 'd', mode: 'operator-pending'
+        expect(vimState.operationStack.isEmpty()).toBe(false)
+        ensure 'escape', mode: 'normal', text: '012345\nabcdef'
+        expect(vimState.operationStack.isEmpty()).toBe(true)
+
+  describe "activate-normal-mode-once command", ->
+    beforeEach ->
+      set
+        text: """
+        0 23456
+        1 23456
+        """
+        cursor: [0, 2]
+      ensure 'i', mode: 'insert', cursor: [0, 2]
+
+    it "activate normal mode without moving cursors left, then back to insert-mode once some command executed", ->
+      ensure 'ctrl-o', cursor: [0, 2], mode: 'normal'
+      ensure 'l', cursor: [0, 3], mode: 'insert'
 
   describe "insert-mode", ->
     beforeEach -> keystroke 'i'
@@ -197,8 +214,68 @@ describe "VimState", ->
         mode: 'normal'
 
     it "puts the editor into normal mode when <ctrl-c> is pressed", ->
-      ensure [{platform: 'platform-darwin'}, {ctrl: 'c'}],
-        mode: 'normal'
+      withMockPlatform editorElement, 'platform-darwin' , ->
+        ensure 'ctrl-c', mode: 'normal'
+
+    describe "clearMultipleCursorsOnEscapeInsertMode setting", ->
+      beforeEach ->
+        set
+          text: 'abc'
+          cursor: [[0, 1], [0, 2]]
+
+      describe "when enabled, clear multiple cursors on escaping insert-mode", ->
+        beforeEach ->
+          settings.set('clearMultipleCursorsOnEscapeInsertMode', true)
+        it "clear multiple cursors by respecting last cursor's position", ->
+          ensure 'escape', mode: 'normal', numCursors: 1, cursor: [0, 1]
+
+        it "clear multiple cursors by respecting last cursor's position", ->
+          set cursor: [[0, 2], [0, 1]]
+          ensure 'escape', mode: 'normal', numCursors: 1, cursor: [0, 0]
+
+      describe "when disabled", ->
+        beforeEach ->
+          settings.set('clearMultipleCursorsOnEscapeInsertMode', false)
+        it "keep multiple cursors", ->
+          ensure 'escape', mode: 'normal', numCursors: 2, cursor: [[0, 0], [0, 1]]
+
+    describe "automaticallyEscapeInsertModeOnActivePaneItemChange setting", ->
+      [otherVim, otherEditor, pane] = []
+
+      beforeEach ->
+        getVimState (otherVimState, _other) ->
+          otherVim = _other
+          otherEditor = otherVimState.editor
+
+        runs ->
+          pane = atom.workspace.getActivePane()
+          pane.activateItem(editor)
+
+          set textC: "|editor-1"
+          otherVim.set textC: "|editor-2"
+
+          ensure 'i', mode: 'insert'
+          otherVim.ensure 'i', mode: 'insert'
+          expect(pane.getActiveItem()).toBe(editor)
+
+      describe "default behavior", ->
+        it "remain in insert-mode on paneItem change by default", ->
+
+          pane.activateItem(otherEditor)
+          expect(pane.getActiveItem()).toBe(otherEditor)
+
+          ensure mode: 'insert'
+          otherVim.ensure mode: 'insert'
+
+      describe "automaticallyEscapeInsertModeOnActivePaneItemChange = true", ->
+        beforeEach ->
+          settings.set('automaticallyEscapeInsertModeOnActivePaneItemChange', true)
+
+        it "return to escape mode for all vimEditors", ->
+          pane.activateItem(otherEditor)
+          expect(pane.getActiveItem()).toBe(otherEditor)
+          ensure mode: 'normal'
+          otherVim.ensure mode: 'normal'
 
   describe "replace-mode", ->
     describe "with content", ->
@@ -207,14 +284,14 @@ describe "VimState", ->
       describe "when cursor is in the middle of the line", ->
         it "moves the cursor to the left when exiting replace mode", ->
           set cursor: [0, 3]
-          ensure ['R', 'escape'], cursor: [0, 2]
+          ensure 'R escape', cursor: [0, 2]
 
       describe "when cursor is at the beginning of line", ->
         beforeEach ->
 
         it "leaves the cursor at the beginning of line", ->
           set cursor: [1, 0]
-          ensure ['R', 'escape'], cursor: [1, 0]
+          ensure 'R escape', cursor: [1, 0]
 
       describe "on a line with content", ->
         it "allows the cursor to be placed on the \n character", ->
@@ -223,18 +300,20 @@ describe "VimState", ->
           ensure cursor: [0, 6]
 
     it "puts the editor into normal mode when <escape> is pressed", ->
-      ensure ['R', 'escape'],
+      ensure 'R escape',
         mode: 'normal'
 
     it "puts the editor into normal mode when <ctrl-c> is pressed", ->
-      ensure [{platform: 'platform-darwin'}, 'R', {ctrl: 'c'}],
-        mode: 'normal'
+      withMockPlatform editorElement, 'platform-darwin' , ->
+        ensure 'R ctrl-c', mode: 'normal'
 
   describe "visual-mode", ->
     beforeEach ->
       set
-        text: "one two three"
-        cursorBuffer: [0, 4]
+        text: """
+        one two three
+        """
+        cursor: [0, 4]
       keystroke 'v'
 
     it "selects the character under the cursor", ->
@@ -244,17 +323,17 @@ describe "VimState", ->
 
     it "puts the editor into normal mode when <escape> is pressed", ->
       ensure 'escape',
-        cursorBuffer: [0, 4]
+        cursor: [0, 4]
         mode: 'normal'
 
     it "puts the editor into normal mode when <escape> is pressed on selection is reversed", ->
       ensure selectedText: 't'
-      ensure 'hh',
+      ensure 'h h',
         selectedText: 'e t'
         selectionIsReversed: true
       ensure 'escape',
         mode: 'normal'
-        cursorBuffer: [0, 2]
+        cursor: [0, 2]
 
     describe "motions", ->
       it "transforms the selection", ->
@@ -270,50 +349,32 @@ describe "VimState", ->
         set
           text: "012345\n\nabcdef"
           cursor: [0, 0]
-        ensure 'Vd', text: "\nabcdef"
+        ensure 'V d', text: "\nabcdef"
 
     describe "returning to normal-mode", ->
       it "operate on the current selection", ->
         set text: "012345\n\nabcdef"
-        ensure ['V', 'escape'], selectedText: ''
+        ensure 'V escape', selectedText: ''
 
     describe "the o keybinding", ->
       it "reversed each selection", ->
-        set addCursor: [0, Infinity]
-        ensure 'iw',
-          selectedBufferRange: [
-            [[0, 4], [0, 7]],
-            [[0, 8], [0, 13]]
-          ]
-          cursorBuffer: [
-            [0, 7]
-            [0, 13]
-          ]
-
+        set addCursor: [0, 12]
+        ensure 'i w',
+          selectedText: ["two", "three"]
+          selectionIsReversed: false
         ensure 'o',
-          selectedBufferRange: [
-            [[0, 4], [0, 7]],
-            [[0, 8], [0, 13]]
-          ]
-          cursorBuffer: [
-            [0, 4]
-            [0, 8]
-          ]
+          selectionIsReversed: true
 
-      # [FIXME]
-      # Current spec is based on actual behavior.
-      # I disabled temporarily because simply passing this test is non-sence.
-      # I need re-think, how spec would be.
       xit "harmonizes selection directions", ->
-        set cursorBuffer: [0, 0]
-        keystroke 'ee'
+        set cursor: [0, 0]
+        keystroke 'e e'
         set addCursor: [0, Infinity]
-        ensure 'hh',
+        ensure 'h h',
           selectedBufferRange: [
             [[0, 0], [0, 5]],
             [[0, 11], [0, 13]]
           ]
-          cursorBuffer: [
+          cursor: [
             [0, 5]
             [0, 11]
           ]
@@ -323,7 +384,7 @@ describe "VimState", ->
             [[0, 0], [0, 5]],
             [[0, 11], [0, 13]]
           ]
-          cursorBuffer: [
+          cursor: [
             [0, 5]
             [0, 13]
           ]
@@ -333,10 +394,44 @@ describe "VimState", ->
       beforeEach ->
         cursorPosition = [0, 4]
         set
-          text: "line one\nline two\nline three\n"
+          text: """
+            line one
+            line two
+            line three\n
+            """
           cursor: cursorPosition
 
         ensure 'escape', mode: 'normal'
+
+      describe "restore characterwise from linewise", ->
+        beforeEach ->
+          ensure 'v', mode: ['visual', 'characterwise']
+          ensure '2 j V',
+            selectedText: """
+              line one
+              line two
+              line three\n
+              """
+            mode: ['visual', 'linewise']
+            selectionIsReversed: false
+          ensure 'o',
+            selectedText: """
+              line one
+              line two
+              line three\n
+              """
+            mode: ['visual', 'linewise']
+            selectionIsReversed: true
+
+        it "v after o", ->
+          ensure 'v',
+            selectedText: " one\nline two\nline "
+            mode: ['visual', 'characterwise']
+            selectionIsReversed: true
+        it "escape after o", ->
+          ensure 'escape',
+            cursor: [0, 4]
+            mode: 'normal'
 
       describe "activateVisualMode with same type puts the editor into normal mode", ->
         describe "characterwise: vv", ->
@@ -351,23 +446,23 @@ describe "VimState", ->
 
         describe "blockwise: ctrl-v twice", ->
           it "activating twice make editor return to normal mode ", ->
-            ensure {ctrl: 'v'}, mode: ['visual', 'blockwise']
-            ensure {ctrl: 'v'}, mode: 'normal', cursor: cursorPosition
+            ensure 'ctrl-v', mode: ['visual', 'blockwise']
+            ensure 'ctrl-v', mode: 'normal', cursor: cursorPosition
 
       describe "change submode within visualmode", ->
         beforeEach ->
           set
             text: "line one\nline two\nline three\n"
-            cursorBuffer: [[0, 5], [2, 5]]
+            cursor: [[0, 5], [2, 5]]
 
         it "can change submode within visual mode", ->
           ensure 'v'        , mode: ['visual', 'characterwise']
           ensure 'V'        , mode: ['visual', 'linewise']
-          ensure {ctrl: 'v'}, mode: ['visual', 'blockwise']
+          ensure 'ctrl-v', mode: ['visual', 'blockwise']
           ensure 'v'        , mode: ['visual', 'characterwise']
 
         it "recover original range when shift from linewise to characterwise", ->
-          ensure 'viw', selectedText: ['one', 'three']
+          ensure 'v i w', selectedText: ['one', 'three']
           ensure 'V', selectedText: ["line one\n", "line three\n"]
           ensure 'v', selectedText: ["one", "three"]
 
@@ -386,12 +481,12 @@ describe "VimState", ->
             cursor: [0, 0]
 
         it "keep goalColumn when shift linewise to characterwise", ->
-          ensure 'V', selectedText: text.getLines([0]), characterwiseHead: [0, 0], mode: ['visual', 'linewise']
-          ensure '$', selectedText: text.getLines([0]), characterwiseHead: [0, 15], mode: ['visual', 'linewise']
-          ensure 'j', selectedText: text.getLines([0, 1]), characterwiseHead: [1, 9], mode: ['visual', 'linewise']
-          ensure 'j', selectedText: text.getLines([0..2]), characterwiseHead: [2, 6], mode: ['visual', 'linewise']
-          ensure 'v', selectedText: text.getLines([0..2], chomp: true), characterwiseHead: [2, 6], mode: ['visual', 'characterwise']
-          ensure 'j', selectedText: text.getLines([0..3], chomp: true), cursor: [3, 11], mode: ['visual', 'characterwise']
+          ensure 'V', selectedText: text.getLines([0]), propertyHead: [0, 0], mode: ['visual', 'linewise']
+          ensure '$', selectedText: text.getLines([0]), propertyHead: [0, 16], mode: ['visual', 'linewise']
+          ensure 'j', selectedText: text.getLines([0, 1]), propertyHead: [1, 10], mode: ['visual', 'linewise']
+          ensure 'j', selectedText: text.getLines([0..2]), propertyHead: [2, 7], mode: ['visual', 'linewise']
+          ensure 'v', selectedText: text.getLines([0..2]), propertyHead: [2, 7], mode: ['visual', 'characterwise']
+          ensure 'j', selectedText: text.getLines([0..3]), propertyHead: [3, 11], mode: ['visual', 'characterwise']
           ensure 'v', cursor: [3, 10], mode: 'normal'
           ensure 'j', cursor: [4, 15], mode: 'normal'
 
@@ -408,9 +503,10 @@ describe "VimState", ->
       it "can put cursor at in visual char mode", ->
         ensure 'v', mode: ['visual', 'characterwise'], cursor: [0, 8]
       it "adjust cursor position 1 column left when deactivated", ->
-        ensure ['v', 'escape'], mode: 'normal', cursor: [0, 7]
-      it "[CHANGED from vim-mode] can not select new line in characterwise visual mode", ->
-        ensure 'vll', cursor: [0, 8]
+        ensure 'v escape', mode: 'normal', cursor: [0, 7]
+      it "can select new line in visual mode", ->
+        ensure 'v', cursor: [0, 8], propertyHead: [0, 7]
+        ensure 'l', cursor: [1, 0], propertyHead: [0, 8]
         ensure 'escape', mode: 'normal', cursor: [0, 7]
 
     describe "deactivating visual mode on blank line", ->
@@ -428,37 +524,108 @@ describe "VimState", ->
         ensure 'escape', mode: 'normal', cursor: [1, 0]
       it "v case-2 selection head is blank line", ->
         set cursor: [0, 1]
-        ensure 'vj', mode: ['visual', 'characterwise'], cursor: [2, 0], selectedText: ": abc\n\n"
+        ensure 'v j', mode: ['visual', 'characterwise'], cursor: [2, 0], selectedText: ": abc\n\n"
         ensure 'escape', mode: 'normal', cursor: [1, 0]
       it "V case-1", ->
         ensure 'V', mode: ['visual', 'linewise'], cursor: [2, 0]
         ensure 'escape', mode: 'normal', cursor: [1, 0]
       it "V case-2 selection head is blank line", ->
         set cursor: [0, 1]
-        ensure 'Vj', mode: ['visual', 'linewise'], cursor: [2, 0], selectedText: "0: abc\n\n"
+        ensure 'V j', mode: ['visual', 'linewise'], cursor: [2, 0], selectedText: "0: abc\n\n"
         ensure 'escape', mode: 'normal', cursor: [1, 0]
       it "ctrl-v", ->
-        ensure {ctrl: 'v'}, mode: ['visual', 'blockwise'], cursor: [2, 0]
+        ensure 'ctrl-v', mode: ['visual', 'blockwise'], selectedBufferRange: [[1, 0], [1, 0]]
         ensure 'escape', mode: 'normal', cursor: [1, 0]
+      it "ctrl-v and move over empty line", ->
+        ensure 'ctrl-v', mode: ['visual', 'blockwise'], selectedBufferRangeOrdered: [[1, 0], [1, 0]]
+        ensure 'k', mode: ['visual', 'blockwise'], selectedBufferRangeOrdered: [[[0, 0], [0, 1]], [[1, 0], [1, 0]]]
+        ensure 'j', mode: ['visual', 'blockwise'], selectedBufferRangeOrdered: [[1, 0], [1, 0]]
+        ensure 'j', mode: ['visual', 'blockwise'], selectedBufferRangeOrdered: [[[1, 0], [1, 0]], [[2, 0], [2, 1]]]
 
   describe "marks", ->
     beforeEach -> set text: "text in line 1\ntext in line 2\ntext in line 3"
 
     it "basic marking functionality", ->
       set cursor: [1, 1]
-      ensure ['m', char: 't'],
-        text: "text in line 1\ntext in line 2\ntext in line 3"
+      keystroke 'm t'
       set cursor: [2, 2]
-      ensure ['`', char: 't'], cursor: [1, 1]
+      ensure '` t', cursor: [1, 1]
 
     it "real (tracking) marking functionality", ->
       set cursor: [2, 2]
-      keystroke ['m', char: 'q']
+      keystroke 'm q'
       set cursor: [1, 2]
-      ensure ['o', 'escape', '`', char: 'q'], cursor: [3, 2]
+      ensure 'o escape ` q', cursor: [3, 2]
 
     it "real (tracking) marking functionality", ->
       set cursor: [2, 2]
-      keystroke ['m', char: 'q']
+      keystroke 'm q'
       set cursor: [1, 2]
-      ensure ['dd', 'escape', '`', char: 'q'], cursor: [1, 2]
+      ensure 'd d escape ` q', cursor: [1, 2]
+
+  describe "is-narrowed attribute", ->
+    ensureNormalModeState = ->
+      ensure "escape",
+        mode: 'normal'
+        selectedText: ''
+        selectionIsNarrowed: false
+    beforeEach ->
+      set
+        text: """
+        1:-----
+        2:-----
+        3:-----
+        4:-----
+        """
+        cursor: [0, 0]
+
+    describe "normal-mode", ->
+      it "is not narrowed", ->
+        ensure
+          mode: ['normal']
+          selectionIsNarrowed: false
+    describe "visual-mode.characterwise", ->
+      it "[single row] is narrowed", ->
+        ensure 'v $',
+          selectedText: '1:-----\n'
+          mode: ['visual', 'characterwise']
+          selectionIsNarrowed: false
+        ensureNormalModeState()
+      it "[multi-row] is narrowed", ->
+        ensure 'v j',
+          selectedText: """
+          1:-----
+          2
+          """
+          mode: ['visual', 'characterwise']
+          selectionIsNarrowed: true
+        ensureNormalModeState()
+    describe "visual-mode.linewise", ->
+      it "[single row] is narrowed", ->
+        ensure 'V',
+          selectedText: "1:-----\n"
+          mode: ['visual', 'linewise']
+          selectionIsNarrowed: false
+        ensureNormalModeState()
+      it "[multi-row] is narrowed", ->
+        ensure 'V j',
+          selectedText: """
+          1:-----
+          2:-----\n
+          """
+          mode: ['visual', 'linewise']
+          selectionIsNarrowed: true
+        ensureNormalModeState()
+    describe "visual-mode.blockwise", ->
+      it "[single row] is narrowed", ->
+        ensure 'ctrl-v l',
+          selectedText: "1:"
+          mode: ['visual', 'blockwise']
+          selectionIsNarrowed: false
+        ensureNormalModeState()
+      it "[multi-row] is narrowed", ->
+        ensure 'ctrl-v l j',
+          selectedText: ["1:", "2:"]
+          mode: ['visual', 'blockwise']
+          selectionIsNarrowed: true
+        ensureNormalModeState()

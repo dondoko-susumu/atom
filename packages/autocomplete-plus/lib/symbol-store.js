@@ -1,4 +1,4 @@
-"use babel"
+'use babel'
 
 const EMPTY_ARRAY = []
 
@@ -16,7 +16,7 @@ class Symbol {
   matchingTypeForConfig (config) {
     let matchingType = null
     let highestTypePriority = -1
-    for (let type of Object.keys(config)) {
+    for (const type of Object.keys(config)) {
       let {selectors, typePriority} = config[type]
       if (selectors == null) continue
       if (typePriority == null) typePriority = 0
@@ -33,7 +33,7 @@ class Symbol {
 export default class SymbolStore {
   constructor (wordRegex) {
     this.wordRegex = wordRegex
-    this.linesByBuffer = new Map
+    this.linesByBuffer = new Map()
   }
 
   clear (buffer) {
@@ -45,19 +45,38 @@ export default class SymbolStore {
   }
 
   symbolsForConfig (config, buffers, prefix, wordUnderCursor, cursorBufferRow, numberOfCursors) {
-    this.prefixCache = fuzzaldrinPlus.prepQuery(prefix)
+    this.prefixCache = fuzzaldrinPlus.prepareQuery(prefix)
 
-    let firstLetter = prefix[0].toLowerCase()
-    let symbolsByWord = new Map()
-    let wordOccurrences = new Map()
-    for (let bufferLines of this.linesForBuffers(buffers)) {
+    const firstLetter = prefix[0].toLowerCase()
+    const symbolsByWord = new Map()
+    const wordOccurrences = new Map()
+    const builtinSymbolsByWord = new Set()
+
+    const suggestions = []
+    for (const type of Object.keys(config)) {
+      const symbols = config[type].suggestions || EMPTY_ARRAY
+      for (const symbol of symbols) {
+        const {score} = this.scoreSymbol(prefix, symbol, cursorBufferRow, Number.MAX_VALUE)
+        if (score > 0) {
+          symbol.replacementPrefix = prefix
+          suggestions.push({symbol, score})
+          if (symbol.text) {
+            builtinSymbolsByWord.add(symbol.text)
+          } else if (symbol.snippet) {
+            builtinSymbolsByWord.add(symbol.snippet)
+          }
+        }
+      }
+    }
+
+    for (const bufferLines of this.linesForBuffers(buffers)) {
       let symbolBufferRow = 0
-      for (let lineSymbolsByLetter of bufferLines) {
-        let symbols = lineSymbolsByLetter.get(firstLetter) || EMPTY_ARRAY
+      for (const lineSymbolsByLetter of bufferLines) {
+        const symbols = lineSymbolsByLetter.get(firstLetter) || EMPTY_ARRAY
         for (let symbol of symbols) {
           wordOccurrences.set(symbol.text, (wordOccurrences.get(symbol.text) || 0) + 1)
 
-          let symbolForWord = symbolsByWord.get(symbol.text)
+          const symbolForWord = symbolsByWord.get(symbol.text)
           if (symbolForWord != null) {
             symbolForWord.localityScore = Math.max(
               this.getLocalityScore(cursorBufferRow, symbolBufferRow),
@@ -66,12 +85,14 @@ export default class SymbolStore {
           } else if (wordUnderCursor === symbol.text && wordOccurrences.get(symbol.text) <= numberOfCursors) {
             continue
           } else {
-            let {score, localityScore} = this.scoreSymbol(prefix, symbol, cursorBufferRow, symbolBufferRow)
+            const {score, localityScore} = this.scoreSymbol(prefix, symbol, cursorBufferRow, symbolBufferRow)
             if (score > 0) {
-              let type = symbol.matchingTypeForConfig(config)
+              const type = symbol.matchingTypeForConfig(config)
               if (type != null) {
                 symbol = {text: symbol.text, type, replacementPrefix: prefix}
-                symbolsByWord.set(symbol.text, {symbol, score, localityScore})
+                if (!builtinSymbolsByWord.has(symbol.text)) {
+                  symbolsByWord.set(symbol.text, {symbol, score, localityScore})
+                }
               }
             }
           }
@@ -81,38 +102,26 @@ export default class SymbolStore {
       }
     }
 
-    let suggestions = []
-    for (let type of Object.keys(config)) {
-      let symbols = config[type].suggestions || EMPTY_ARRAY
-      for (let symbol of symbols) {
-        let {score} = this.scoreSymbol(prefix, symbol, cursorBufferRow, Number.MAX_VALUE)
-        if (score > 0) {
-          symbol.replacementPrefix = prefix
-          suggestions.push({symbol, score})
-        }
-      }
-    }
-
     return Array.from(symbolsByWord.values()).concat(suggestions)
   }
 
   recomputeSymbolsForEditorInBufferRange (editor, start, oldExtent, newExtent) {
-    let newEnd = start.row + newExtent.row
-    let newLines = []
+    const newEnd = start.row + newExtent.row
+    const newLines = []
     // TODO: Remove this conditional once atom/ns-use-display-layers reaches stable and editor.tokenizedBuffer is available
-    let tokenizedBuffer = editor.tokenizedBuffer ? editor.tokenizedBuffer : editor.displayBuffer.tokenizedBuffer
+    const tokenizedBuffer = editor.tokenizedBuffer ? editor.tokenizedBuffer : editor.displayBuffer.tokenizedBuffer
 
-    for (var bufferRow = start.row; bufferRow <= newEnd; bufferRow++) {
-      let tokenizedLine = tokenizedBuffer.tokenizedLineForRow(bufferRow)
+    for (let bufferRow = start.row; bufferRow <= newEnd; bufferRow++) {
+      const tokenizedLine = tokenizedBuffer.tokenizedLineForRow(bufferRow)
       if (tokenizedLine == null) continue
 
-      let symbolsByLetter = new Map
-      let tokenIterator = tokenizedLine.getTokenIterator()
+      const symbolsByLetter = new Map()
+      const tokenIterator = tokenizedLine.getTokenIterator()
       while (tokenIterator.next()) {
-        let wordsWithinToken = tokenIterator.getText().match(this.wordRegex) || EMPTY_ARRAY
-        for (let wordWithinToken of wordsWithinToken) {
-          let symbol = new Symbol(wordWithinToken, tokenIterator.getScopes())
-          let firstLetter = symbol.text[0].toLowerCase()
+        const wordsWithinToken = tokenIterator.getText().match(this.wordRegex) || EMPTY_ARRAY
+        for (const wordWithinToken of wordsWithinToken) {
+          const symbol = new Symbol(wordWithinToken, tokenIterator.getScopes())
+          const firstLetter = symbol.text[0].toLowerCase()
           if (!symbolsByLetter.has(firstLetter)) symbolsByLetter.set(firstLetter, [])
           symbolsByLetter.get(firstLetter).push(symbol)
         }
@@ -121,7 +130,7 @@ export default class SymbolStore {
       newLines.push(symbolsByLetter)
     }
 
-    let bufferLines = this.linesForBuffer(editor.getBuffer())
+    const bufferLines = this.linesForBuffer(editor.getBuffer())
     spliceWithArray(bufferLines, start.row, oldExtent.row + 1, newLines)
   }
 
@@ -151,7 +160,7 @@ export default class SymbolStore {
   }
 
   scoreSymbol (prefix, symbol, cursorBufferRow, symbolBufferRow) {
-    let text = symbol.text || symbol.snippet
+    const text = symbol.text || symbol.snippet
     if (this.useStrictMatching) {
       return this.strictMatchScore(prefix, text)
     } else {
@@ -171,9 +180,9 @@ export default class SymbolStore {
       return {score: 0, localityScore: 0}
     }
 
-    let fuzzaldrinProvider = this.useAlternateScoring ? fuzzaldrinPlus : fuzzaldrin
-    let score = fuzzaldrinProvider.score(text, prefix, this.prefixCache)
-    let localityScore = this.getLocalityScore(cursorBufferRow, symbolBufferRow)
+    const fuzzaldrinProvider = this.useAlternateScoring ? fuzzaldrinPlus : fuzzaldrin
+    const score = fuzzaldrinProvider.score(text, prefix, { preparedQuery: this.prefixCache })
+    const localityScore = this.getLocalityScore(cursorBufferRow, symbolBufferRow)
     return {score, localityScore}
   }
 
@@ -182,17 +191,17 @@ export default class SymbolStore {
       return 1
     }
 
-    let rowDifference = Math.abs(symbolBufferRow - cursorBufferRow)
+    const rowDifference = Math.abs(symbolBufferRow - cursorBufferRow)
     if (this.useAlternateScoring) {
       // Between 1 and 1 + strength. (here between 1.0 and 2.0)
       // Avoid a pow and a branching max.
       // 25 is the number of row where the bonus is 3/4 faded away.
       // strength is the factor in front of fade*fade. Here it is 1.0
-      let fade = 25.0 / (25.0 + rowDifference)
+      const fade = 25.0 / (25.0 + rowDifference)
       return 1.0 + fade * fade
     } else {
       // Will be between 1 and ~2.75
-      return 1 + Math.max(-Math.pow(.2 * rowDifference - 3, 3) / 25 + .5, 0)
+      return 1 + Math.max(-Math.pow(0.2 * rowDifference - 3, 3) / 25 + 0.5, 0)
     }
   }
 }

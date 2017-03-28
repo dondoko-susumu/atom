@@ -6,14 +6,14 @@ class InsertMode extends Base
   @extend(false)
   constructor: ->
     super
-    @initialize?()
+    @initialize()
 
 class InsertRegister extends InsertMode
   @extend()
-  hover: icon: '"', emoji: '"'
   requireInput: true
 
   initialize: ->
+    super
     @focusInput()
 
   execute: ->
@@ -40,15 +40,12 @@ class CopyFromLineAbove extends InsertMode
   """
   rowDelta: -1
 
-  getTargetRange: (cursor, translation) ->
-    point = cursor.getBufferPosition().translate(translation)
-    Range.fromPointWithDelta(point, 0, 1)
-
   execute: ->
     translation = [@rowDelta, 0]
     @editor.transact =>
       for selection in @editor.getSelections()
-        range = @getTargetRange(selection.cursor, translation)
+        point = selection.cursor.getBufferPosition().translate(translation)
+        range = Range.fromPointWithDelta(point, 0, 1)
         if text = @editor.getTextInBufferRange(range)
           selection.insertText(text)
 

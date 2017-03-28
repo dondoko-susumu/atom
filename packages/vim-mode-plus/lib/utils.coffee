@@ -1,18 +1,26 @@
 fs = require 'fs-plus'
-semver = require 'semver'
 settings = require './settings'
 
-{Range, Point} = require 'atom'
+{Disposable, Range, Point} = require 'atom'
 _ = require 'underscore-plus'
 
-getParent = (obj) ->
-  obj.__super__?.constructor
+assert = (condition, message, fn) ->
+  unless fn?
+    fn = (error) ->
+      console.error error.message
+  atom.assert(condition, message, fn)
+
+assertWithException = (condition, message, fn) ->
+  atom.assert condition, message, (error) ->
+    throw new Error(error.message)
 
 getAncestors = (obj) ->
   ancestors = []
-  ancestors.push (current=obj)
-  while current = getParent(current)
-    ancestors.push current
+  current = obj
+  loop
+    ancestors.push(current)
+    current = current.__super__?.constructor
+    break unless current
   ancestors
 
 getKeyBindingForCommand = (command, {packageName}) ->
@@ -20,7 +28,7 @@ getKeyBindingForCommand = (command, {packageName}) ->
   keymaps = atom.keymaps.getKeyBindings()
   if packageName?
     keymapPath = atom.packages.getActivePackage(packageName).getKeymapPaths().pop()
-    keymaps = keymaps.filter ({source}) -> source is keymapPath
+    keymaps = keymaps.filter(({source}) -> source is keymapPath)
 
   for keymap in keymaps when keymap.command is command
     {keystrokes, selector} = keymap
@@ -33,75 +41,41 @@ include = (klass, module) ->
   for key, value of module
     klass::[key] = value
 
-debug = (message) ->
+debug = (messages...) ->
   return unless settings.get('debug')
-  message += "\n"
   switch settings.get('debugOutput')
     when 'console'
-      console.log message
+      console.log messages...
     when 'file'
       filePath = fs.normalize settings.get('debugOutputFilePath')
       if fs.existsSync(filePath)
-        fs.appendFileSync filePath, message
-
-getNonBlankCharPositionForRow = (editor, row) ->
-  scanRange = editor.bufferRangeForBufferRow(row)
-  point = null
-  editor.scanInBufferRange /^[ \t]*/, scanRange, ({range}) ->
-    point = range.end.translate([0, +1])
-  point
-
-getView = (model) ->
-  atom.views.getView(model)
+        fs.appendFileSync filePath, messages + "\n"
 
 # Return function to restore editor's scrollTop and fold state.
 saveEditorState = (editor) ->
-  editorElement = getView(editor)
+  editorElement = editor.element
   scrollTop = editorElement.getScrollTop()
-  foldStartRows = editor.displayBuffer.findFoldMarkers({}).map (m) ->
-    editor.displayBuffer.foldForMarker(m).getStartRow()
+
+  foldStartRows = editor.displayLayer.foldsMarkerLayer.findMarkers({}).map (m) -> m.getStartPosition().row
   ->
     for row in foldStartRows.reverse() when not editor.isFoldedAtBufferRow(row)
-      editor.foldBufferRow row
-    editorElement.setScrollTop scrollTop
-
-getKeystrokeForEvent = (event) ->
-  keyboardEvent = event.originalEvent.originalEvent ? event.originalEvent
-  atom.keymaps.keystrokeForKeyboardEvent(keyboardEvent)
-
-keystrokeToCharCode =
-  backspace: 8
-  tab: 9
-  enter: 13
-  escape: 27
-  space: 32
-  delete: 127
-
-getCharacterForEvent = (event) ->
-  keystroke = getKeystrokeForEvent(event)
-  if charCode = keystrokeToCharCode[keystroke]
-    String.fromCharCode(charCode)
-  else
-    keystroke
+      editor.foldBufferRow(row)
+    editorElement.setScrollTop(scrollTop)
 
 isLinewiseRange = ({start, end}) ->
   (start.row isnt end.row) and (start.column is end.column is 0)
 
 isEndsWithNewLineForBufferRow = (editor, row) ->
-  {start, end} = editor.bufferRangeForBufferRow(row, {includeNewline: true})
-  end.isGreaterThan(start) and end.column is 0
+  {start, end} = editor.bufferRangeForBufferRow(row, includeNewline: true)
+  start.row isnt end.row
 
-haveSomeSelection = (editor) ->
-  editor.getSelections().some (selection) ->
-    not selection.isEmpty()
+haveSomeNonEmptySelection = (editor) ->
+  editor.getSelections().some(isNotEmpty)
 
-sortRanges = (ranges) ->
-  ranges.sort((a, b) -> a.compare(b))
+sortRanges = (collection) ->
+  collection.sort (a, b) -> a.compare(b)
 
-sortRangesByEnd = (ranges, fn) ->
-  ranges.sort((a, b) -> a.end.compare(b.end))
-
-# return adjusted index fit whitin length
+# Return adjusted index fit whitin given list's length
 # return -1 if list is empty.
 getIndex = (index, list) ->
   length = list.length
@@ -114,164 +88,92 @@ getIndex = (index, list) ->
     else
       length + index
 
-withVisibleBufferRange = (editor, fn) ->
-  if range = getVisibleBufferRange(editor)
-    fn(range)
-  else
-    disposable = getView(editor).onDidAttach ->
-      disposable.dispose()
-      range = getVisibleBufferRange(editor)
-      fn(range)
-
+# NOTE: endRow become undefined if @editorElement is not yet attached.
+# e.g. Beging called immediately after open file.
 getVisibleBufferRange = (editor) ->
-  [startRow, endRow] = getView(editor).getVisibleRowRange()
+  [startRow, endRow] = editor.element.getVisibleRowRange()
   return null unless (startRow? and endRow?)
   startRow = editor.bufferRowForScreenRow(startRow)
   endRow = editor.bufferRowForScreenRow(endRow)
   new Range([startRow, 0], [endRow, Infinity])
 
 getVisibleEditors = ->
-  for pane in atom.workspace.getPanes() when editor = pane.getActiveEditor()
-    editor
+  (editor for pane in atom.workspace.getPanes() when editor = pane.getActiveEditor())
 
-eachSelection = (editor, fn) ->
-  for selection in editor.getSelections()
-    fn(selection)
-
-eachCursor = (editor, fn) ->
-  for cursor in editor.getCursors()
-    fn(cursor)
-
-# Takes a transaction and turns it into a string of what was typed.
-# This class is an implementation detail of ActivateInsertMode
-# Return final newRanges from changes
-distanceForRange = ({start, end}) ->
-  row = end.row - start.row
-  column = end.column - start.column
-  new Point(row, column)
-
-# [TODO] Remove this code once I updated minimum Atom version to >=1.7.0
-getNewTextRangeFromChanges = (changes) ->
-  finalRange = null
-  for change in changes when change.newRange?
-    {oldRange, oldText, newRange, newText} = change
-    unless finalRange?
-      finalRange = newRange.copy() if newText.length
-      continue
-    # shrink
-    if oldText.length and finalRange.containsRange(oldRange)
-      amount = oldRange
-      diff = distanceForRange(amount)
-      diff.column = 0 unless (amount.end.row is finalRange.end.row)
-      finalRange.end = finalRange.end.translate(diff.negate())
-    # extend
-    if newText.length and finalRange.containsPoint(newRange.start)
-      amount = newRange
-      diff = distanceForRange(amount)
-      diff.column = 0 unless (amount.start.row is finalRange.end.row)
-      finalRange.end = finalRange.end.translate(diff)
-  finalRange
-
-getNewTextRangeFromPaches = (patches) ->
-  if (patch = Patch.compose(patches).getChanges().shift())?
-    newStart = Point.fromObject(patch.newStart)
-    new Range(newStart, newStart.traverse(patch.newExtent))
-  else
-    null
-
-Patch = null
-IsSupportPatch = semver.satisfies(atom.appVersion, '>=1.7.0-beta0')
-
-# [TODO] Remove version check code once I updated minimum Atom version to >=1.7.0
-getNewTextRangeFromCheckpoint = (editor, checkpoint) ->
-  {history} = editor.getBuffer()
-  if (index = history.getCheckpointIndex(checkpoint))?
-    changes = history.undoStack.slice(index)
-
-  return null unless changes
-
-  if IsSupportPatch and (not Patch?)
-    for change in changes when change.constructor.name is 'Patch'
-      Patch = change.constructor
-      break
-
-  if IsSupportPatch
-    return null unless Patch?
-    changes = changes.filter (change) -> change instanceof Patch
-    getNewTextRangeFromPaches(changes)
-  else
-    changes = changes.filter (change) -> change.newText?
-    getNewTextRangeFromChanges(changes)
-
-# char can be regExp pattern
-countChar = (string, char) ->
-  string.split(char).length - 1
-
-findIndex = (list, fn) ->
-  for e, i in list when fn(e)
-    return i
-  null
-
-mergeIntersectingRanges = (ranges) ->
-  result = []
-  for range, i in ranges
-    if index = findIndex(result, (r) -> r.intersectsWith(range))
-      result[index] = result[index].union(range)
-    else
-      result.push(range)
-  result
-
-getEolBufferPositionForRow = (editor, row) ->
+getEndOfLineForBufferRow = (editor, row) ->
   editor.bufferRangeForBufferRow(row).end
 
-getEolBufferPositionForCursor = (cursor) ->
-  getEolBufferPositionForRow(cursor.editor, cursor.getBufferRow())
-
+# Point util
+# -------------------------
 pointIsAtEndOfLine = (editor, point) ->
   point = Point.fromObject(point)
-  getEolBufferPositionForRow(editor, point.row).isEqual(point)
+  getEndOfLineForBufferRow(editor, point.row).isEqual(point)
 
-characterAtBufferPosition = (editor, point) ->
-  range = Range.fromPointWithDelta(point, 0, 1)
-  editor.getTextInBufferRange(range)
+pointIsOnWhiteSpace = (editor, point) ->
+  char = getRightCharacterForBufferPosition(editor, point)
+  not /\S/.test(char)
 
-characterAtScreenPosition = (editor, point) ->
-  screenRange = Range.fromPointWithDelta(point, 0, 1)
-  range = editor.bufferRangeForScreenRange(screenRange)
-  editor.getTextInBufferRange(range)
+pointIsAtEndOfLineAtNonEmptyRow = (editor, point) ->
+  point = Point.fromObject(point)
+  point.column isnt 0 and pointIsAtEndOfLine(editor, point)
 
-getTextAtCursor = (cursor) ->
-  {editor} = cursor
-  bufferRange = editor.bufferRangeForScreenRange(cursor.getScreenRange())
-  editor.getTextInBufferRange(bufferRange)
+pointIsAtVimEndOfFile = (editor, point) ->
+  getVimEofBufferPosition(editor).isEqual(point)
+
+isEmptyRow = (editor, row) ->
+  editor.bufferRangeForBufferRow(row).isEmpty()
+
+# Cursor state validateion
+# -------------------------
+cursorIsAtEndOfLineAtNonEmptyRow = (cursor) ->
+  pointIsAtEndOfLineAtNonEmptyRow(cursor.editor, cursor.getBufferPosition())
+
+cursorIsAtVimEndOfFile = (cursor) ->
+  pointIsAtVimEndOfFile(cursor.editor, cursor.getBufferPosition())
+
+# -------------------------
+getRightCharacterForBufferPosition = (editor, point, amount=1) ->
+  editor.getTextInBufferRange(Range.fromPointWithDelta(point, 0, amount))
+
+getLeftCharacterForBufferPosition = (editor, point, amount=1) ->
+  editor.getTextInBufferRange(Range.fromPointWithDelta(point, 0, -amount))
 
 getTextInScreenRange = (editor, screenRange) ->
   bufferRange = editor.bufferRangeForScreenRange(screenRange)
   editor.getTextInBufferRange(bufferRange)
 
-cursorIsOnWhiteSpace = (cursor) ->
-  isAllWhiteSpace(getTextAtCursor(cursor))
+getNonWordCharactersForCursor = (cursor) ->
+  # Atom 1.11.0-beta5 have this experimental method.
+  if cursor.getNonWordCharacters?
+    cursor.getNonWordCharacters()
+  else
+    scope = cursor.getScopeDescriptor().getScopesArray()
+    atom.config.get('editor.nonWordCharacters', {scope})
 
+# FIXME: remove this
 # return true if moved
 moveCursorToNextNonWhitespace = (cursor) ->
   originalPoint = cursor.getBufferPosition()
-  while cursorIsOnWhiteSpace(cursor) and (not cursorIsAtVimEndOfFile(cursor))
+  editor = cursor.editor
+  vimEof = getVimEofBufferPosition(editor)
+
+  while pointIsOnWhiteSpace(editor, point = cursor.getBufferPosition()) and not point.isGreaterThanOrEqual(vimEof)
     cursor.moveRight()
   not originalPoint.isEqual(cursor.getBufferPosition())
 
-getBufferRows = (editor, {startRow, direction, includeStartRow}) ->
+getBufferRows = (editor, {startRow, direction}) ->
   switch direction
     when 'previous'
-      unless includeStartRow
-        return [] if startRow is 0
-        startRow -= 1 if startRow > 0
-      [startRow..0]
+      if startRow <= 0
+        []
+      else
+        [(startRow - 1)..0]
     when 'next'
-      vimLastBufferRow = getVimLastBufferRow(editor)
-      unless includeStartRow
-        return [] if startRow is vimLastBufferRow
-        startRow += 1 if startRow < vimLastBufferRow
-      [startRow..vimLastBufferRow]
+      endRow = getVimLastBufferRow(editor)
+      if startRow >= endRow
+        []
+      else
+        [(startRow + 1)..endRow]
 
 # Return Vim's EOF position rather than Atom's EOF position.
 # This function change meaning of EOF from native TextEditor::getEofBufferPosition()
@@ -281,62 +183,74 @@ getBufferRows = (editor, {startRow, direction, includeStartRow}) ->
 # But in Vim, curor can NOT past last newline. EOF is next position of very last character.
 getVimEofBufferPosition = (editor) ->
   eof = editor.getEofBufferPosition()
-  if eof.column is 0
-    getEolBufferPositionForRow(editor, Math.max(0, eof.row - 1))
-  else
+  if (eof.row is 0) or (eof.column > 0)
     eof
+  else
+    getEndOfLineForBufferRow(editor, eof.row - 1)
 
 getVimEofScreenPosition = (editor) ->
   editor.screenPositionForBufferPosition(getVimEofBufferPosition(editor))
 
-pointIsAtVimEndOfFile = (editor, point) ->
-  getVimEofBufferPosition(editor).isEqual(point)
+getVimLastBufferRow = (editor) -> getVimEofBufferPosition(editor).row
+getVimLastScreenRow = (editor) -> getVimEofScreenPosition(editor).row
+getFirstVisibleScreenRow = (editor) -> editor.element.getFirstVisibleScreenRow()
+getLastVisibleScreenRow = (editor) -> editor.element.getLastVisibleScreenRow()
 
-cursorIsAtVimEndOfFile = (cursor) ->
-  pointIsAtVimEndOfFile(cursor.editor, cursor.getBufferPosition())
+getFirstCharacterPositionForBufferRow = (editor, row) ->
+  range = findRangeInBufferRow(editor, /\S/, row)
+  range?.start ? new Point(row, 0)
 
-cursorIsAtEmptyRow = (cursor) ->
-  cursor.isAtBeginningOfLine() and cursor.isAtEndOfLine()
-
-getVimLastBufferRow = (editor) ->
-  getVimEofBufferPosition(editor).row
-
-getVimLastScreenRow = (editor) ->
-  getVimEofScreenPosition(editor).row
-
-getFirstVisibleScreenRow = (editor) ->
-  getView(editor).getFirstVisibleScreenRow()
-
-getLastVisibleScreenRow = (editor) ->
-  getView(editor).getLastVisibleScreenRow()
-
-getFirstCharacterColumForBufferRow = (editor, row) ->
-  text = editor.lineTextForBufferRow(row)
-  if (column = text.search(/\S/)) >= 0
-    column
+trimRange = (editor, scanRange) ->
+  pattern = /\S/
+  [start, end] = []
+  setStart = ({range}) -> {start} = range
+  setEnd = ({range}) -> {end} = range
+  editor.scanInBufferRange(pattern, scanRange, setStart)
+  editor.backwardsScanInBufferRange(pattern, scanRange, setEnd) if start?
+  if start? and end?
+    new Range(start, end)
   else
-    0
-
-cursorIsAtFirstCharacter = (cursor) ->
-  {editor} = cursor
-  column = cursor.getBufferColumn()
-  firstCharColumn = getFirstCharacterColumForBufferRow(editor, cursor.getBufferRow())
-  column is firstCharColumn
+    scanRange
 
 # Cursor motion wrapper
 # -------------------------
+# Just update bufferRow with keeping column by respecting goalColumn
+setBufferRow = (cursor, row, options) ->
+  column = cursor.goalColumn ? cursor.getBufferColumn()
+  cursor.setBufferPosition([row, column], options)
+  cursor.goalColumn = column
+
+setBufferColumn = (cursor, column) ->
+  cursor.setBufferPosition([cursor.getBufferRow(), column])
+
 moveCursor = (cursor, {preserveGoalColumn}, fn) ->
   {goalColumn} = cursor
   fn(cursor)
-  if preserveGoalColumn and goalColumn
+  if preserveGoalColumn and goalColumn?
     cursor.goalColumn = goalColumn
+
+# Workaround issue for t9md/vim-mode-plus#226 and atom/atom#3174
+# I cannot depend cursor's column since its claim 0 and clipping emmulation don't
+# return wrapped line, but It actually wrap, so I need to do very dirty work to
+# predict wrap huristically.
+shouldPreventWrapLine = (cursor) ->
+  {row, column} = cursor.getBufferPosition()
+  if atom.config.get('editor.softTabs')
+    tabLength = atom.config.get('editor.tabLength')
+    if 0 < column < tabLength
+      text = cursor.editor.getTextInBufferRange([[row, 0], [row, tabLength]])
+      /^\s+$/.test(text)
+    else
+      false
 
 # options:
 #   allowWrap: to controll allow wrap
 #   preserveGoalColumn: preserve original goalColumn
 moveCursorLeft = (cursor, options={}) ->
-  {allowWrap} = options
+  {allowWrap, needSpecialCareToPreventWrapLine} = options
   delete options.allowWrap
+  if needSpecialCareToPreventWrapLine
+    return if shouldPreventWrapLine(cursor)
 
   if not cursor.isAtBeginningOfLine() or allowWrap
     motion = (cursor) -> cursor.moveLeft()
@@ -349,12 +263,12 @@ moveCursorRight = (cursor, options={}) ->
     motion = (cursor) -> cursor.moveRight()
     moveCursor(cursor, options, motion)
 
-moveCursorUp = (cursor, options={}) ->
+moveCursorUpScreen = (cursor, options={}) ->
   unless cursor.getScreenRow() is 0
     motion = (cursor) -> cursor.moveUp()
     moveCursor(cursor, options, motion)
 
-moveCursorDown = (cursor, options={}) ->
+moveCursorDownScreen = (cursor, options={}) ->
   unless getVimLastScreenRow(cursor.editor) is cursor.getScreenRow()
     motion = (cursor) -> cursor.moveDown()
     moveCursor(cursor, options, motion)
@@ -375,74 +289,19 @@ moveCursorToFirstCharacterAtRow = (cursor, row) ->
   cursor.setBufferPosition([row, 0])
   cursor.moveToFirstCharacterOfLine()
 
-markerOptions = {ivalidate: 'never', persistent: false}
-# Return markers
-highlightRanges = (editor, ranges, options) ->
-  ranges = [ranges] unless _.isArray(ranges)
-  return null unless ranges.length
+getValidVimBufferRow = (editor, row) -> limitNumber(row, min: 0, max: getVimLastBufferRow(editor))
 
-  markers = ranges.map (range) ->
-    editor.markBufferRange(range, markerOptions)
-
-  for marker in markers
-    editor.decorateMarker marker,
-      type: 'highlight'
-      class: options.class
-
-  {timeout} = options
-  if timeout?
-    setTimeout  ->
-      marker.destroy() for marker in markers
-    , timeout
-  markers
-
-# Return valid row from 0 to vimLastBufferRow
-getValidVimBufferRow = (editor, row) ->
-  vimLastBufferRow = getVimLastBufferRow(editor)
-  switch
-    when (row < 0) then 0
-    when (row > vimLastBufferRow) then vimLastBufferRow
-    else row
-
-# Return valid row from 0 to vimLastScreenRow
-getValidVimScreenRow = (editor, row) ->
-  vimLastScreenRow = getVimLastScreenRow(editor)
-  switch
-    when (row < 0) then 0
-    when (row > vimLastScreenRow) then vimLastScreenRow
-    else row
-
-# special {translate} option is used to translate AFTER converting to
-# screenPosition
-# Since translate in bufferPosition is abondoned when converted to screenPosition.
-clipScreenPositionForBufferPosition = (editor, bufferPosition, options) ->
-  screenPosition = editor.screenPositionForBufferPosition(bufferPosition)
-  {translate} = options
-  delete options.translate
-  screenPosition = screenPosition.translate(translate) if translate
-  editor.clipScreenPosition(screenPosition, options)
+getValidVimScreenRow = (editor, row) -> limitNumber(row, min: 0, max: getVimLastScreenRow(editor))
 
 # By default not include column
-getTextToPoint = (editor, {row, column}, {exclusive}={}) ->
-  exclusive ?= true
-  if exclusive
+getLineTextToBufferPosition = (editor, {row, column}, {exclusive}={}) ->
+  if exclusive ? true
     editor.lineTextForBufferRow(row)[0...column]
   else
     editor.lineTextForBufferRow(row)[0..column]
 
-getTextFromPointToEOL = (editor, {row, column}, {exclusive}={}) ->
-  exclusive ?= false
-  start = column
-  start += 1 if exclusive
-  editor.lineTextForBufferRow(row)[start..]
-
 getIndentLevelForBufferRow = (editor, row) ->
-  text = editor.lineTextForBufferRow(row)
-  editor.indentLevelForLine(text)
-
-WhiteSpaceRegExp = /^\s*$/
-isAllWhiteSpace = (text) ->
-  WhiteSpaceRegExp.test(text)
+  editor.indentLevelForLine(editor.lineTextForBufferRow(row))
 
 getCodeFoldRowRanges = (editor) ->
   [0..editor.getLastBufferRow()]
@@ -451,21 +310,22 @@ getCodeFoldRowRanges = (editor) ->
     .filter (rowRange) ->
       rowRange? and rowRange[0]? and rowRange[1]?
 
-# * `exclusive` to exclude startRow to determine inclusion.
-getCodeFoldRowRangesContainesForRow = (editor, bufferRow, exclusive=false) ->
+# Used in vmp-jasmine-increase-focus
+getCodeFoldRowRangesContainesForRow = (editor, bufferRow, {includeStartRow}={}) ->
+  includeStartRow ?= true
   getCodeFoldRowRanges(editor).filter ([startRow, endRow]) ->
-    if exclusive
-      startRow < bufferRow <= endRow
-    else
+    if includeStartRow
       startRow <= bufferRow <= endRow
+    else
+      startRow < bufferRow <= endRow
 
 getBufferRangeForRowRange = (editor, rowRange) ->
-  [rangeStart, rangeEnd] = rowRange.map (row) ->
+  [startRange, endRange] = rowRange.map (row) ->
     editor.bufferRangeForBufferRow(row, includeNewline: true)
-  rangeStart.union(rangeEnd)
+  startRange.union(endRange)
 
 getTokenizedLineForRow = (editor, row) ->
-  editor.displayBuffer.tokenizedBuffer.tokenizedLineForRow(row)
+  editor.tokenizedBuffer.tokenizedLineForRow(row)
 
 getScopesForTokenizedLine = (line) ->
   for tag in line.tags when tag < 0 and (tag % 2 is -1)
@@ -492,15 +352,15 @@ scanForScopeStart = (editor, fromPoint, direction, fn) ->
     tokenIterator = tokenizedLine.getTokenIterator()
     for tag in tokenizedLine.tags
       tokenIterator.next()
-      if tag > 0
-        column += switch
-          when tokenIterator.isHardTab() then 1
-          when tokenIterator.isSoftWrapIndentation() then 0
-          else tag
-      else if (tag % 2 is -1)
+      if tag < 0 # Negative: start/stop token
         scope = atom.grammars.scopeForId(tag)
-        position = new Point(row, column)
-        results.push {scope, position, stop}
+        if (tag % 2) is 0 # Even: scope stop
+          null
+        else # Odd: scope start
+          position = new Point(row, column)
+          results.push {scope, position, stop}
+      else
+        column += tag
 
     results = results.filter(isValidToken)
     results.reverse() if direction is 'backward'
@@ -530,20 +390,20 @@ isIncludeFunctionScopeForRow = (editor, row) ->
 
 # [FIXME] very rough state, need improvement.
 isFunctionScope = (editor, scope) ->
-  {scopeName} = editor.getGrammar()
-  switch scopeName
-    when 'source.go'
-      /^entity\.name\.function/.test(scope)
+  switch editor.getGrammar().scopeName
+    when 'source.go', 'source.elixir'
+      scopes = ['entity.name.function']
+    when 'source.ruby'
+      scopes = ['meta.function.', 'meta.class.', 'meta.module.']
     else
-      /^meta\.function\./.test(scope)
-
-sortComparable = (collection) ->
-  collection.sort (a, b) -> a.compare(b)
+      scopes = ['meta.function.', 'meta.class.']
+  pattern = new RegExp('^' + scopes.map(_.escapeRegExp).join('|'))
+  pattern.test(scope)
 
 # Scroll to bufferPosition with minimum amount to keep original visible area.
 # If target position won't fit within onePageUp or onePageDown, it center target point.
 smartScrollToBufferPosition = (editor, point) ->
-  editorElement = getView(editor)
+  editorElement = editor.element
   editorAreaHeight = editor.getLineHeightInPixels() * (editor.getRowsPerPage() - 1)
   onePageUp = editorElement.getScrollTop() - editorAreaHeight # No need to limit to min=0
   onePageDown = editorElement.getScrollBottom() + editorAreaHeight
@@ -552,23 +412,222 @@ smartScrollToBufferPosition = (editor, point) ->
   center = (onePageDown < target) or (target < onePageUp)
   editor.scrollToBufferPosition(point, {center})
 
-# Debugging purpose
-# -------------------------
-logGoalColumnForSelection = (subject, selection) ->
-  console.log "#{subject}: goalColumn = ", selection.cursor.goalColumn
+matchScopes = (editorElement, scopes) ->
+  classes = scopes.map (scope) -> scope.split('.')
 
-reportSelection = (subject, selection) ->
-  console.log subject, selection.getBufferRange().toString()
+  for classNames in classes
+    containsCount = 0
+    for className in classNames
+      containsCount += 1 if editorElement.classList.contains(className)
+    return true if containsCount is classNames.length
+  false
 
-reportCursor = (subject, cursor) ->
-  console.log subject, cursor.getBufferPosition().toString()
+isSingleLineText = (text) ->
+  text.split(/\n|\r\n/).length is 1
 
-withTrackingCursorPositionChange = (cursor, fn) ->
-  cursorBefore = cursor.getBufferPosition()
-  fn()
-  cursorAfter = cursor.getBufferPosition()
-  unless cursorBefore.isEqual(cursorAfter)
-    console.log "Changed: #{cursorBefore.toString()} -> #{cursorAfter.toString()}"
+# Return bufferRange and kind ['white-space', 'non-word', 'word']
+#
+# This function modify wordRegex so that it feel NATURAL in Vim's normal mode.
+# In normal-mode, cursor is ractangle(not pipe(|) char).
+# Cursor is like ON word rather than BETWEEN word.
+# The modification is tailord like this
+#   - ON white-space: Includs only white-spaces.
+#   - ON non-word: Includs only non word char(=excludes normal word char).
+#
+# Valid options
+#  - wordRegex: instance of RegExp
+#  - nonWordCharacters: string
+getWordBufferRangeAndKindAtBufferPosition = (editor, point, options={}) ->
+  {singleNonWordChar, wordRegex, nonWordCharacters, cursor} = options
+  if not wordRegex? or not nonWordCharacters? # Complement from cursor
+    cursor ?= editor.getLastCursor()
+    {wordRegex, nonWordCharacters} = _.extend(options, buildWordPatternByCursor(cursor, options))
+  singleNonWordChar ?= true
+
+  characterAtPoint = getRightCharacterForBufferPosition(editor, point)
+  nonWordRegex = new RegExp("[#{_.escapeRegExp(nonWordCharacters)}]+")
+
+  if /\s/.test(characterAtPoint)
+    source = "[\t ]+"
+    kind = 'white-space'
+    wordRegex = new RegExp(source)
+  else if nonWordRegex.test(characterAtPoint) and not wordRegex.test(characterAtPoint)
+    kind = 'non-word'
+    if singleNonWordChar
+      source = _.escapeRegExp(characterAtPoint)
+      wordRegex = new RegExp(source)
+    else
+      wordRegex = nonWordRegex
+  else
+    kind = 'word'
+
+  range = getWordBufferRangeAtBufferPosition(editor, point, {wordRegex})
+  {kind, range}
+
+getWordPatternAtBufferPosition = (editor, point, options={}) ->
+  boundarizeForWord = options.boundarizeForWord ? true
+  delete options.boundarizeForWord
+  {range, kind} = getWordBufferRangeAndKindAtBufferPosition(editor, point, options)
+  text = editor.getTextInBufferRange(range)
+  pattern = _.escapeRegExp(text)
+
+  if kind is 'word' and boundarizeForWord
+    # Set word-boundary( \b ) anchor only when it's effective #689
+    startBoundary = if /^\w/.test(text) then "\\b" else ''
+    endBoundary = if /\w$/.test(text) then "\\b" else ''
+    pattern = startBoundary + pattern + endBoundary
+  new RegExp(pattern, 'g')
+
+getSubwordPatternAtBufferPosition = (editor, point, options={}) ->
+  options = {wordRegex: editor.getLastCursor().subwordRegExp(), boundarizeForWord: false}
+  getWordPatternAtBufferPosition(editor, point, options)
+
+# Return options used for getWordBufferRangeAtBufferPosition
+buildWordPatternByCursor = (cursor, {wordRegex}) ->
+  nonWordCharacters = getNonWordCharactersForCursor(cursor)
+  wordRegex ?= new RegExp("^[\t ]*$|[^\\s#{_.escapeRegExp(nonWordCharacters)}]+")
+  {wordRegex, nonWordCharacters}
+
+getBeginningOfWordBufferPosition = (editor, point, {wordRegex}={}) ->
+  scanRange = [[point.row, 0], point]
+
+  found = null
+  editor.backwardsScanInBufferRange wordRegex, scanRange, ({range, matchText, stop}) ->
+    return if matchText is '' and range.start.column isnt 0
+
+    if range.start.isLessThan(point)
+      if range.end.isGreaterThanOrEqual(point)
+        found = range.start
+      stop()
+
+  found ? point
+
+getEndOfWordBufferPosition = (editor, point, {wordRegex}={}) ->
+  scanRange = [point, [point.row, Infinity]]
+
+  found = null
+  editor.scanInBufferRange wordRegex, scanRange, ({range, matchText, stop}) ->
+    return if matchText is '' and range.start.column isnt 0
+
+    if range.end.isGreaterThan(point)
+      if range.start.isLessThanOrEqual(point)
+        found = range.end
+      stop()
+
+  found ? point
+
+getWordBufferRangeAtBufferPosition = (editor, position, options={}) ->
+  endPosition = getEndOfWordBufferPosition(editor, position, options)
+  startPosition = getBeginningOfWordBufferPosition(editor, endPosition, options)
+  new Range(startPosition, endPosition)
+
+adjustRangeToRowRange = ({start, end}, options={}) ->
+  # when linewise, end row is at column 0 of NEXT line
+  # So need adjust to actually selected row in same way as Seleciton::getBufferRowRange()
+  endRow = end.row
+  if end.column is 0
+    endRow = limitNumber(end.row - 1, min: start.row)
+  if options.endOnly ? false
+    new Range(start, [endRow, Infinity])
+  else
+    new Range([start.row, 0], [endRow, Infinity])
+
+# When range is linewise range, range end have column 0 of NEXT row.
+# Which is very unintuitive and unwanted result.
+shrinkRangeEndToBeforeNewLine = (range) ->
+  {start, end} = range
+  if end.column is 0
+    endRow = limitNumber(end.row - 1, min: start.row)
+    new Range(start, [endRow, Infinity])
+  else
+    range
+
+scanEditor = (editor, pattern) ->
+  ranges = []
+  editor.scan pattern, ({range}) ->
+    ranges.push(range)
+  ranges
+
+collectRangeInBufferRow = (editor, row, pattern) ->
+  ranges = []
+  scanRange = editor.bufferRangeForBufferRow(row)
+  editor.scanInBufferRange pattern, scanRange, ({range}) ->
+    ranges.push(range)
+  ranges
+
+findRangeInBufferRow = (editor, pattern, row, {direction}={}) ->
+  if direction is 'backward'
+    scanFunctionName = 'backwardsScanInBufferRange'
+  else
+    scanFunctionName = 'scanInBufferRange'
+
+  range = null
+  scanRange = editor.bufferRangeForBufferRow(row)
+  editor[scanFunctionName] pattern, scanRange, (event) -> range = event.range
+  range
+
+getLargestFoldRangeContainsBufferRow = (editor, row) ->
+  markers = editor.displayLayer.foldsMarkerLayer.findMarkers(intersectsRow: row)
+
+  startPoint = null
+  endPoint = null
+
+  for marker in markers ? []
+    {start, end} = marker.getRange()
+    unless startPoint
+      startPoint = start
+      endPoint = end
+      continue
+
+    if start.isLessThan(startPoint)
+      startPoint = start
+      endPoint = end
+
+  if startPoint? and endPoint?
+    new Range(startPoint, endPoint)
+
+# take bufferPosition
+translatePointAndClip = (editor, point, direction) ->
+  point = Point.fromObject(point)
+
+  dontClip = false
+  switch direction
+    when 'forward'
+      point = point.translate([0, +1])
+      eol = editor.bufferRangeForBufferRow(point.row).end
+
+      if point.isEqual(eol)
+        dontClip = true
+      else if point.isGreaterThan(eol)
+        dontClip = true
+        point = new Point(point.row + 1, 0) # move point to new-line selected point
+
+      point = Point.min(point, editor.getEofBufferPosition())
+
+    when 'backward'
+      point = point.translate([0, -1])
+
+      if point.column < 0
+        dontClip = true
+        newRow = point.row - 1
+        eol = editor.bufferRangeForBufferRow(newRow).end
+        point = new Point(newRow, eol.column)
+
+      point = Point.max(point, Point.ZERO)
+
+  if dontClip
+    point
+  else
+    screenPoint = editor.screenPositionForBufferPosition(point, clipDirection: direction)
+    editor.bufferPositionForScreenPosition(screenPoint)
+
+getRangeByTranslatePointAndClip = (editor, range, which, direction) ->
+  newPoint = translatePointAndClip(editor, range[which], direction)
+  switch which
+    when 'start'
+      new Range(newPoint, range.end)
+    when 'end'
+      new Range(range.start, newPoint)
 
 # Reloadable registerElement
 registerElement = (name, options) ->
@@ -581,109 +640,250 @@ registerElement = (name, options) ->
     Element.prototype = options.prototype if options.prototype?
   Element
 
-ElementBuilder =
-  includeInto: (target) ->
-    for name, value of this when name isnt "includeInto"
-      target::[name] = value.bind(this)
+getPackage = (name, fn) ->
+  new Promise (resolve) ->
+    if atom.packages.isPackageActive(name)
+      pkg = atom.packages.getActivePackage(name)
+      resolve(pkg)
+    else
+      disposable = atom.packages.onDidActivatePackage (pkg) ->
+        if pkg.name is name
+          disposable.dispose()
+          resolve(pkg)
 
-  div: (params) ->
-    @createElement 'div', params
+searchByProjectFind = (editor, text) ->
+  atom.commands.dispatch(editor.element, 'project-find:show')
+  getPackage('find-and-replace').then (pkg) ->
+    {projectFindView} = pkg.mainModule
+    if projectFindView?
+      projectFindView.findEditor.setText(text)
+      projectFindView.confirm()
 
-  span: (params) ->
-    @createElement 'span', params
+limitNumber = (number, {max, min}={}) ->
+  number = Math.min(number, max) if max?
+  number = Math.max(number, min) if min?
+  number
 
-  atomTextEditor: (params) ->
-    @createElement 'atom-text-editor', params
+findRangeContainsPoint = (ranges, point) ->
+  for range in ranges when range.containsPoint(point)
+    return range
+  null
 
-  createElement: (element, {classList, textContent, id, attribute}) ->
-    element = document.createElement element
+negateFunction = (fn) ->
+  (args...) ->
+    not fn(args...)
 
-    element.id = id if id?
-    element.classList.add classList... if classList?
-    element.textContent = textContent if textContent?
-    for name, value of attribute ? {}
-      element.setAttribute(name, value)
-    element
+isEmpty = (target) -> target.isEmpty()
+isNotEmpty = negateFunction(isEmpty)
+
+isSingleLineRange = (range) -> range.isSingleLine()
+isNotSingleLineRange = negateFunction(isSingleLineRange)
+
+isLeadingWhiteSpaceRange = (editor, range) -> /^[\t ]*$/.test(editor.getTextInBufferRange(range))
+isNotLeadingWhiteSpaceRange = negateFunction(isLeadingWhiteSpaceRange)
+
+isEscapedCharRange = (editor, range) ->
+  range = Range.fromObject(range)
+  chars = getLeftCharacterForBufferPosition(editor, range.start, 2)
+  chars.endsWith('\\') and not chars.endsWith('\\\\')
+
+insertTextAtBufferPosition = (editor, point, text) ->
+  editor.setTextInBufferRange([point, point], text)
+
+ensureEndsWithNewLineForBufferRow = (editor, row) ->
+  unless isEndsWithNewLineForBufferRow(editor, row)
+    eol = getEndOfLineForBufferRow(editor, row)
+    insertTextAtBufferPosition(editor, eol, "\n")
+
+forEachPaneAxis = (fn, base) ->
+  base ?= atom.workspace.getActivePane().getContainer().getRoot()
+  if base.children?
+    fn(base)
+
+    for child in base.children
+      forEachPaneAxis(fn, child)
+
+modifyClassList = (action, element, classNames...) ->
+  element.classList[action](classNames...)
+
+addClassList = modifyClassList.bind(null, 'add')
+removeClassList = modifyClassList.bind(null, 'remove')
+toggleClassList = modifyClassList.bind(null, 'toggle')
+
+toggleCaseForCharacter = (char) ->
+  charLower = char.toLowerCase()
+  if charLower is char
+    char.toUpperCase()
+  else
+    charLower
+
+splitTextByNewLine = (text) ->
+  if text.endsWith("\n")
+    text.trimRight().split(/\r?\n/g)
+  else
+    text.split(/\r?\n/g)
+
+# Modify range used for undo/redo flash highlight to make it feel naturally for human.
+#  - Trim starting new line("\n")
+#     "\nabc" -> "abc"
+#  - If range.end is EOL extend range to first column of next line.
+#     "abc" -> "abc\n"
+# e.g.
+# - when 'c' is atEOL: "\nabc" -> "abc\n"
+# - when 'c' is NOT atEOL: "\nabc" -> "abc"
+#
+# So always trim initial "\n" part range because flashing trailing line is counterintuitive.
+humanizeBufferRange = (editor, range) ->
+  if isSingleLineRange(range) or isLinewiseRange(range)
+    return range
+
+  {start, end} = range
+  if pointIsAtEndOfLine(editor, start)
+    newStart = start.traverse([1, 0])
+
+  if pointIsAtEndOfLine(editor, end)
+    newEnd = end.traverse([1, 0])
+
+  if newStart? or newEnd?
+    new Range(newStart ? start, newEnd ? end)
+  else
+    range
+
+# Expand range to white space
+#  1. Expand to forward direction, if suceed return new range.
+#  2. Expand to backward direction, if succeed return new range.
+#  3. When faild to expand either direction, return original range.
+expandRangeToWhiteSpaces = (editor, range) ->
+  {start, end} = range
+
+  newEnd = null
+  scanRange = [end, getEndOfLineForBufferRow(editor, end.row)]
+  editor.scanInBufferRange /\S/, scanRange, ({range}) -> newEnd = range.start
+
+  if newEnd?.isGreaterThan(end)
+    return new Range(start, newEnd)
+
+  newStart = null
+  scanRange = [[start.row, 0], range.start]
+  editor.backwardsScanInBufferRange /\S/, scanRange, ({range}) -> newStart = range.end
+
+  if newStart?.isLessThan(start)
+    return new Range(newStart, end)
+
+  return range # fallback
+
+scanEditorInDirection = (editor, direction, pattern, options={}, fn) ->
+  {allowNextLine, from, scanRange} = options
+  if not from? and not scanRange?
+    throw new Error("You must either of 'from' or 'scanRange' options")
+
+  if scanRange
+    allowNextLine = true
+  else
+    allowNextLine ?= true
+  from = Point.fromObject(from) if from?
+  switch direction
+    when 'forward'
+      scanRange ?= new Range(from, getVimEofBufferPosition(editor))
+      scanFunction = 'scanInBufferRange'
+    when 'backward'
+      scanRange ?= new Range([0, 0], from)
+      scanFunction = 'backwardsScanInBufferRange'
+
+  editor[scanFunction] pattern, scanRange, (event) ->
+    if not allowNextLine and event.range.start.row isnt from.row
+      event.stop()
+      return
+    fn(event)
 
 module.exports = {
-  getParent
+  assert
+  assertWithException
   getAncestors
   getKeyBindingForCommand
   include
   debug
-  getNonBlankCharPositionForRow
-  getView
   saveEditorState
-  getKeystrokeForEvent
-  getCharacterForEvent
   isLinewiseRange
-  isEndsWithNewLineForBufferRow
-  haveSomeSelection
+  haveSomeNonEmptySelection
   sortRanges
-  sortRangesByEnd
   getIndex
   getVisibleBufferRange
-  withVisibleBufferRange
   getVisibleEditors
-  eachSelection
-  eachCursor
-  getNewTextRangeFromCheckpoint
-  findIndex
-  mergeIntersectingRanges
   pointIsAtEndOfLine
+  pointIsOnWhiteSpace
+  pointIsAtEndOfLineAtNonEmptyRow
   pointIsAtVimEndOfFile
   cursorIsAtVimEndOfFile
-  characterAtBufferPosition
-  characterAtScreenPosition
   getVimEofBufferPosition
   getVimEofScreenPosition
   getVimLastBufferRow
   getVimLastScreenRow
+  setBufferRow
+  setBufferColumn
   moveCursorLeft
   moveCursorRight
-  moveCursorUp
-  moveCursorDown
-  getEolBufferPositionForRow
-  getEolBufferPositionForCursor
+  moveCursorUpScreen
+  moveCursorDownScreen
+  getEndOfLineForBufferRow
   getFirstVisibleScreenRow
   getLastVisibleScreenRow
-  highlightRanges
   getValidVimBufferRow
   getValidVimScreenRow
   moveCursorToFirstCharacterAtRow
-  countChar
-  clipScreenPositionForBufferPosition
-  getTextToPoint
-  getTextFromPointToEOL
+  getLineTextToBufferPosition
   getIndentLevelForBufferRow
-  isAllWhiteSpace
-  getTextAtCursor
   getTextInScreenRange
-  cursorIsOnWhiteSpace
   moveCursorToNextNonWhitespace
-  cursorIsAtEmptyRow
+  isEmptyRow
+  cursorIsAtEndOfLineAtNonEmptyRow
   getCodeFoldRowRanges
   getCodeFoldRowRangesContainesForRow
   getBufferRangeForRowRange
-  getFirstCharacterColumForBufferRow
-  cursorIsAtFirstCharacter
-  isFunctionScope
+  trimRange
+  getFirstCharacterPositionForBufferRow
   isIncludeFunctionScopeForRow
-  getTokenizedLineForRow
-  getScopesForTokenizedLine
-  scanForScopeStart
   detectScopeStartPositionForScope
   getBufferRows
-  ElementBuilder
   registerElement
-  sortComparable
   smartScrollToBufferPosition
+  matchScopes
   moveCursorDownBuffer
   moveCursorUpBuffer
+  isSingleLineText
+  getWordBufferRangeAtBufferPosition
+  getWordBufferRangeAndKindAtBufferPosition
+  getWordPatternAtBufferPosition
+  getSubwordPatternAtBufferPosition
+  getNonWordCharactersForCursor
+  shrinkRangeEndToBeforeNewLine
+  scanEditor
+  collectRangeInBufferRow
+  findRangeInBufferRow
+  getLargestFoldRangeContainsBufferRow
+  translatePointAndClip
+  getRangeByTranslatePointAndClip
+  getPackage
+  searchByProjectFind
+  limitNumber
+  findRangeContainsPoint
 
-  # Debugging
-  reportSelection,
-  reportCursor
-  withTrackingCursorPositionChange
-  logGoalColumnForSelection
+  isEmpty, isNotEmpty
+  isSingleLineRange, isNotSingleLineRange
+
+  insertTextAtBufferPosition
+  ensureEndsWithNewLineForBufferRow
+  isLeadingWhiteSpaceRange
+  isNotLeadingWhiteSpaceRange
+  isEscapedCharRange
+
+  forEachPaneAxis
+  addClassList
+  removeClassList
+  toggleClassList
+  toggleCaseForCharacter
+  splitTextByNewLine
+  humanizeBufferRange
+  expandRangeToWhiteSpaces
+  scanEditorInDirection
 }

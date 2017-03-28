@@ -16,7 +16,7 @@ describe "vim-mode-plus", ->
       atom.packages.activatePackage('status-bar')
 
   afterEach ->
-    vimState.activate('reset') unless vimState.destroyed
+    vimState.resetNormalMode() if vimState.isAlive()
 
   describe ".activate", ->
     it "puts the editor in normal-mode initially by default", ->
@@ -29,21 +29,9 @@ describe "vim-mode-plus", ->
         statusBarTile = workspaceElement.querySelector("#status-bar-vim-mode-plus")
 
       runs ->
-        expect(statusBarTile.textContent).toBe("Normal")
+        expect(statusBarTile.textContent).toBe("N")
         ensure 'i', mode: 'insert'
-        expect(statusBarTile.textContent).toBe("Insert")
-
-    it "doesn't register duplicate command listeners for editors", ->
-      set
-        text: '12345'
-        cursorBuffer: [0, 0]
-
-      pane = atom.workspace.getActivePane()
-      newPane = pane.splitRight()
-      pane.removeItem(editor)
-      newPane.addItem(editor)
-
-      ensure 'l', cursorBuffer: [0, 1]
+        expect(statusBarTile.textContent).toBe("I")
 
   describe ".deactivate", ->
     it "removes the vim classes from the editor", ->

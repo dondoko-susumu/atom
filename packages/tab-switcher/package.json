@@ -1,0 +1,60 @@
+{
+  "_args": [
+    [
+      {
+        "raw": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117215-39263-pahiri/package.tgz",
+        "scope": null,
+        "escapedName": null,
+        "name": null,
+        "rawSpec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117215-39263-pahiri/package.tgz",
+        "spec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117215-39263-pahiri/package.tgz",
+        "type": "local"
+      },
+      "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/apm-install-dir-117215-39263-1ic5wgl"
+    ]
+  ],
+  "_from": "../d-117215-39263-pahiri/package.tgz",
+  "_id": "tab-switcher@1.5.4",
+  "_inCache": true,
+  "_installable": true,
+  "_location": "/tab-switcher",
+  "_phantomChildren": {},
+  "_requested": {
+    "raw": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117215-39263-pahiri/package.tgz",
+    "scope": null,
+    "escapedName": null,
+    "name": null,
+    "rawSpec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117215-39263-pahiri/package.tgz",
+    "spec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117215-39263-pahiri/package.tgz",
+    "type": "local"
+  },
+  "_requiredBy": [
+    "#USER"
+  ],
+  "_resolved": "file:../d-117215-39263-pahiri/package.tgz",
+  "_shasum": "1b38b7b605b1f44d4086bbd680b933da5b184c66",
+  "_shrinkwrap": null,
+  "_spec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117215-39263-pahiri/package.tgz",
+  "_where": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/apm-install-dir-117215-39263-1ic5wgl",
+  "bugs": {
+    "url": "https://github.com/oggy/tab-switcher/issues"
+  },
+  "dependencies": {},
+  "description": "Most recently used (MRU) tab switcher for Atom.",
+  "devDependencies": {},
+  "engines": {
+    "atom": ">=1.7.0 <2.0.0"
+  },
+  "homepage": "https://github.com/oggy/tab-switcher#readme",
+  "license": "MIT",
+  "main": "./lib/tab-switcher",
+  "name": "tab-switcher",
+  "optionalDependencies": {},
+  "readme": "# Tab Switcher\n\n[Atom][atom] package that let's you easily and elegantly switch between your\nmost recently active tabs. Like \"Command-TAB\" or \"Alt-TAB\" for applications.\n\n![Screenshot](https://raw.githubusercontent.com/oggy/tab-switcher/master/doc/tab-switcher.gif)\n\nVisual design is inspired by [Witch](http://manytricks.com/witch), a slick Mac\nOS window switcher.\n\n[atom]: https://atom.io/\n\n## Default Keys\n\n* `alt-[` previous tab\n* `alt-]` next tab\n\n### Using different keys\n\nYou can specify alternate key bindings in `keymap.cson` (menu: Atom -> Keymap).\nA popular desire is to replace the built-in `ctrl-tab` and `ctrl-shift-tab`.\n\n```\n\"atom-workspace\":\n  \"ctrl-tab\": \"tab-switcher:next\"\n  \"ctrl-tab ^ctrl\": \"unset!\"\n  \"ctrl-shift-tab\": \"tab-switcher:previous\"\n  \"ctrl-shift-tab ^ctrl\": \"unset!\"\n\n\"ol.tab-switcher-tab-list\":\n  \"^ctrl\": \"tab-switcher:select\"\n  \"^shift\": \"tab-switcher:select\"\n  \"ctrl-up\": \"tab-switcher:previous\"\n  \"ctrl-down\": \"tab-switcher:next\"\n  \"ctrl-escape\": \"tab-switcher:cancel\"\n  \"ctrl-n\": \"tab-switcher:next\"\n  \"ctrl-p\": \"tab-switcher:previous\"\n  \"ctrl-w\": \"tab-switcher:close\"\n  \"ctrl-s\": \"tab-switcher:save\"\n```\n\n## Icons\n\nIcons are optional, and are provided by the [file-icons][file-icons] package.\n\n[file-icons]: https://github.com/DanBrooker/file-icons\n\n## Contributing\n\n * [Bug reports](https://github.com/oggy/tab-switcher/issues)\n * [Source](https://github.com/oggy/tab-switcher)\n * Patches: Fork on Github, send pull request.\n   * Include tests where practical.\n   * Leave the version alone, or bump it in a separate commit.\n\n## Copyright\n\nCopyright (c) George Ogata. See LICENSE for details.\n",
+  "readmeFilename": "README.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oggy/tab-switcher.git"
+  },
+  "version": "1.5.4"
+}

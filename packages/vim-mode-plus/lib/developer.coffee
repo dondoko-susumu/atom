@@ -1,11 +1,12 @@
 _ = require 'underscore-plus'
 path = require 'path'
+fs = require 'fs-plus'
 {Emitter, Disposable, BufferedProcess, CompositeDisposable} = require 'atom'
 
 Base = require './base'
 {generateIntrospectionReport} = require './introspection'
 settings = require './settings'
-{debug, getParent, getAncestors, getKeyBindingForCommand} = require './utils'
+{debug, getAncestors, getKeyBindingForCommand} = require './utils'
 
 packageScope = 'vim-mode-plus'
 getEditorState = null
@@ -18,25 +19,11 @@ class Developer
 
     commands =
       'toggle-debug': => @toggleDebug()
-
-      # TODO remove once finished #158
-      'debug-highlight-search': ->
-        globalState = require './global-state'
-        editor = atom.workspace.getActiveTextEditor()
-        vimState = getEditorState(editor)
-        console.log 'highlightSearchPattern', globalState.highlightSearchPattern
-        console.log "vimState's id is #{vimState.id}"
-        console.log "hlmarkers are"
-        vimState.highlightSearchMarkers.forEach (marker) ->
-          console.log marker.getBufferRange().toString()
-
       'open-in-vim': => @openInVim()
       'generate-introspection-report': => @generateIntrospectionReport()
-      'generate-command-summary-table-for-commands-have-no-default-keymap': =>
-        @generateCommandSummaryTableForCommandsHaveNoDefaultKeymap()
-      'generate-command-summary-table': =>
-        @generateCommandSummaryTable()
+      'generate-command-summary-table': => @generateCommandSummaryTable()
       'toggle-dev-environment': => @toggleDevEnvironment()
+      'clear-debug-output': => @clearDebugOutput()
       'reload-packages': => @reloadPackages()
       'toggle-reload-packages-on-save': => @toggleReloadPackagesOnSave()
 
@@ -48,11 +35,13 @@ class Developer
   reloadPackages: ->
     packages = settings.get('devReloadPackages') ? []
     packages.push('vim-mode-plus')
+
+    # Deactivate
     for packName in packages
       pack = atom.packages.getLoadedPackage(packName)
 
       if pack?
-        console.log "deactivating #{packName}"
+        console.log "- deactivating #{packName}"
         atom.packages.deactivatePackage(packName)
         atom.packages.unloadPackage(packName)
 
@@ -63,8 +52,11 @@ class Developer
           .forEach (p) ->
             delete require.cache[p]
 
-        atom.packages.loadPackage(packName)
-        atom.packages.activatePackage(packName)
+    # Activate
+    for packName in packages
+      atom.packages.loadPackage(packName)
+      console.log "+ activating #{packName}"
+      atom.packages.activatePackage(packName)
 
   toggleReloadPackagesOnSave: ->
     return unless editor = atom.workspace.getActiveTextEditor()
@@ -97,13 +89,21 @@ class Developer
   addCommand: (name, fn) ->
     atom.commands.add('atom-text-editor', "#{packageScope}:#{name}", fn)
 
+  clearDebugOutput: (name, fn) ->
+    filePath = fs.normalize(settings.get('debugOutputFilePath'))
+    options = {searchAllPanes: true, activatePane: false}
+    atom.workspace.open(filePath, options).then (editor) ->
+      editor.setText('')
+      editor.save()
+
   toggleDebug: ->
     settings.set('debug', not settings.get('debug'))
     console.log "#{settings.scope} debug:", settings.get('debug')
 
   # Borrowed from underscore-plus
   modifierKeyMap =
-    cmd: '\u2318'
+    "ctrl-cmd-": '\u2303\u2318'
+    "cmd-": '\u2318'
     "ctrl-": '\u2303'
     alt: '\u2325'
     option: '\u2325'
@@ -126,6 +126,7 @@ class Developer
     ".linewise": 'L'
     ".operator-pending-mode": 'o'
     ".with-count": '#'
+    ".has-persistent-selection": '%'
 
   getCommandSpecs: ->
     compactSelector = (selector) ->
@@ -137,10 +138,14 @@ class Developer
       .join(",")
 
     compactKeystrokes = (keystrokes) ->
-      pattern = ///(#{_.keys(modifierKeyMap).map(_.escapeRegExp).join('|')})///
+      specialChars = '\\`*_{}[]()#+-.!'
+      specialCharsRegexp = ///#{specialChars.split('').map(_.escapeRegExp).join('|')}///g
+      modifierKeyRegexp = ///(#{_.keys(modifierKeyMap).map(_.escapeRegExp).join('|')})///
       keystrokes
-        .replace(/(`|_)/g, '\\$1')
-        .replace(pattern, (s) -> modifierKeyMap[s])
+        # .replace(/(`|_)/g, '\\$1')
+        .replace(modifierKeyRegexp, (s) -> modifierKeyMap[s])
+        .replace(///(#{specialCharsRegexp})///g, "\\$1")
+        .replace(/\|/g, '&#124;')
         .replace(/\s+/, '')
 
     commands = (
@@ -152,14 +157,14 @@ class Developer
         keymap = null
         if keymaps = getKeyBindingForCommand(commandName, packageName: "vim-mode-plus")
           keymap = keymaps.map ({keystrokes, selector}) ->
-            "`#{compactSelector(selector)}` <kbd>#{compactKeystrokes(keystrokes)}</kbd>"
+            "`#{compactSelector(selector)}` <code>#{compactKeystrokes(keystrokes)}</code>"
           .join("<br/>")
 
         {name, commandName, kind, description, keymap}
     )
     commands
 
-  kinds = ["Operator", "Motion", "TextObject", "InsertMode", "MiscCommand", "Scroll", "VisualBlockwise"]
+  kinds = ["Operator", "Motion", "TextObject", "InsertMode", "MiscCommand", "Scroll"]
   generateSummaryTableForCommandSpecs: (specs, {header}={}) ->
     grouped = _.groupBy(specs, 'kind')
     str = ""
@@ -184,36 +189,34 @@ class Developer
 
   generateCommandSummaryTable: ->
     header = """
-    # Keymap selector abbreviations
+    ## Keymap selector abbreviations
 
     In this document, following abbreviations are used for shortness.
 
-    | Abbrev | Selector                     | Description             |
-    |:-------|:-----------------------------|:------------------------|
-    | `!i`   | `:not(.insert-mode)`         | except insert-mode      |
-    | `i`    | `.insert-mode`               |                         |
-    | `o`    | `.operator-pending-mode`     |                         |
-    | `n`    | `.normal-mode`               |                         |
-    | `v`    | `.visual-mode`               |                         |
-    | `vB`   | `.visual-mode.blockwise`     |                         |
-    | `vL`   | `.visual-mode.linewise`      |                         |
-    | `vC`   | `.visual-mode.characterwise` |                         |
-    | `iR`   | `.insert-mode.replace`       |                         |
-    | `#`    | `.with-count`                | when count is specified |
+    | Abbrev | Selector                     | Description                         |
+    |:-------|:-----------------------------|:------------------------------------|
+    | `!i`   | `:not(.insert-mode)`         | except insert-mode                  |
+    | `i`    | `.insert-mode`               |                                     |
+    | `o`    | `.operator-pending-mode`     |                                     |
+    | `n`    | `.normal-mode`               |                                     |
+    | `v`    | `.visual-mode`               |                                     |
+    | `vB`   | `.visual-mode.blockwise`     |                                     |
+    | `vL`   | `.visual-mode.linewise`      |                                     |
+    | `vC`   | `.visual-mode.characterwise` |                                     |
+    | `iR`   | `.insert-mode.replace`       |                                     |
+    | `#`    | `.with-count`                | when count is specified             |
+    | `%`    | `.has-persistent-selection` | when persistent-selection is exists |
 
     """
     @generateSummaryTableForCommandSpecs(@getCommandSpecs(), {header})
 
-  generateCommandSummaryTableForCommandsHaveNoDefaultKeymap: ->
-    commands = @getCommandSpecs().filter (command) -> not getKeyBindingForCommand(command.commandName, packageName: 'vim-mode-plus')
-    @generateSummaryTableForCommandSpecs(commands)
-
   openInVim: ->
     editor = atom.workspace.getActiveTextEditor()
-    {row} = editor.getCursorBufferPosition()
+    {row, column} = editor.getCursorBufferPosition()
+    # e.g. /Applications/MacVim.app/Contents/MacOS/Vim -g /etc/hosts "+call cursor(4, 3)"
     new BufferedProcess
-      command: "/Applications/MacVim.app/Contents/MacOS/mvim"
-      args: [editor.getPath(), "+#{row+1}"]
+      command: "/Applications/MacVim.app/Contents/MacOS/Vim"
+      args: ['-g', editor.getPath(), "+call cursor(#{row+1}, #{column+1})"]
 
   generateIntrospectionReport: ->
     generateIntrospectionReport _.values(Base.getRegistries()),
@@ -233,7 +236,7 @@ class Developer
 
 class DevEnvironment
   constructor: (@editor) ->
-    @editorElement = atom.views.getView(@editor)
+    @editorElement = @editor.element
     @emitter = new Emitter
     fileName = path.basename(@editor.getPath())
     @disposable = @editor.onDidSave =>

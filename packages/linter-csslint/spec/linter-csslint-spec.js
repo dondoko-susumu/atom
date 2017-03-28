@@ -10,43 +10,45 @@ const projectPath = path.join(__dirname, 'fixtures', 'project');
 const projectBadPath = path.join(projectPath, 'files', 'badWC.css');
 
 describe('The csslint provider for Linter', () => {
-  const lint = require('../lib/main').provideLinter().lint;
+  const lint = require('../lib/main.js').provideLinter().lint;
 
   beforeEach(() => {
     atom.workspace.destroyActivePaneItem();
-    waitsForPromise(() => {
-      atom.packages.activatePackage('linter-csslint');
-      return atom.packages.activatePackage('language-css').then(() =>
-        atom.workspace.open(goodPath)
-      );
-    });
+    waitsForPromise(() =>
+      Promise.all([
+        atom.packages.activatePackage('linter-csslint'),
+        atom.packages.activatePackage('language-css'),
+      ]).then(() =>
+        atom.workspace.open(goodPath),
+      ),
+    );
   });
 
   describe('checks bad.css and', () => {
     let editor = null;
     beforeEach(() =>
       waitsForPromise(() =>
-        atom.workspace.open(badPath).then(openEditor => { editor = openEditor; })
-      )
+        atom.workspace.open(badPath).then((openEditor) => { editor = openEditor; }),
+      ),
     );
 
     it('finds at least one message', () =>
       waitsForPromise(() =>
         lint(editor).then(messages =>
-          expect(messages.length).toBeGreaterThan(0)
-        )
-      )
+          expect(messages.length).toBeGreaterThan(0),
+        ),
+      ),
     );
 
     it('verifies the first message', () =>
       waitsForPromise(() =>
-        lint(editor).then(messages => {
+        lint(editor).then((messages) => {
           expect(messages[0].type).toBe('Warning');
           expect(messages[0].text).toBe('Rule is empty.');
           expect(messages[0].filePath).toBe(badPath);
-          expect(messages[0].range).toEqual([[0, 0], [0, 0]]);
-        })
-      )
+          expect(messages[0].range).toEqual([[0, 0], [0, 4]]);
+        }),
+      ),
     );
   });
 
@@ -54,27 +56,27 @@ describe('The csslint provider for Linter', () => {
     let editor = null;
     beforeEach(() =>
       waitsForPromise(() =>
-        atom.workspace.open(invalidPath).then(openEditor => { editor = openEditor; })
-      )
+        atom.workspace.open(invalidPath).then((openEditor) => { editor = openEditor; }),
+      ),
     );
 
     it('finds one message', () =>
       waitsForPromise(() =>
         lint(editor).then(messages =>
-          expect(messages.length).toBe(1)
-        )
-      )
+          expect(messages.length).toBe(1),
+        ),
+      ),
     );
 
     it('verifies the message', () =>
       waitsForPromise(() =>
-        lint(editor).then(messages => {
+        lint(editor).then((messages) => {
           expect(messages[0].type).toBe('Error');
           expect(messages[0].text).toBe('Unexpected token \'}\' at line 1, col 1.');
           expect(messages[0].filePath).toBe(invalidPath);
-          expect(messages[0].range).toEqual([[0, 0], [0, 0]]);
-        })
-      )
+          expect(messages[0].range).toEqual([[0, 0], [0, 1]]);
+        }),
+      ),
     );
   });
 
@@ -82,33 +84,33 @@ describe('The csslint provider for Linter', () => {
     waitsForPromise(() =>
       atom.workspace.open(goodPath).then(editor =>
         lint(editor).then(messages =>
-          expect(messages.length).toEqual(0)
-        )
-      )
-    )
+          expect(messages.length).toEqual(0),
+        ),
+      ),
+    ),
   );
 
   it('handles an empty file', () =>
     waitsForPromise(() =>
       atom.workspace.open(emptyPath).then(editor =>
         lint(editor).then(messages =>
-          expect(messages.length).toEqual(0)
-        )
-      )
-    )
+          expect(messages.length).toEqual(0),
+        ),
+      ),
+    ),
   );
 
   it('respects .csslintrc configurations at the project root', () => {
     atom.project.addPath(projectPath);
     waitsForPromise(() =>
       atom.workspace.open(projectBadPath).then(editor =>
-        lint(editor).then(messages => {
+        lint(editor).then((messages) => {
           expect(messages[0].type).toBeDefined();
           expect(messages[0].type).toEqual('Error');
           expect(messages[0].text).toBeDefined();
           expect(messages[0].text).toEqual('Rule is empty.');
-        })
-      )
+        }),
+      ),
     );
   });
 });

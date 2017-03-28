@@ -6,7 +6,7 @@ AbstractProvider = require './abstract-provider'
 module.exports =
 
 class FunctionProvider extends AbstractProvider
-    hoverEventSelectors: '.function-call'
+    hoverEventSelectors: '.syntax--function-call'
 
     ###*
      * Retrieves a tooltip for the word given.
@@ -35,11 +35,15 @@ class FunctionProvider extends AbstractProvider
         else if value.isProtected
             accessModifier = 'protected'
 
-        else
+        else if not value.isFunction?
             accessModifier = 'private'
 
         description += "<p><div>"
-        description += accessModifier + ' ' + returnType + ' <strong>' + term + '</strong>' + '('
+
+        if value.isFunction?
+          description += returnType + ' <strong>' + term + '</strong>' + '('
+        else
+          description += accessModifier + ' ' + returnType + ' <strong>' + term + '</strong>' + '('
 
         if value.args.parameters.length > 0
             description += value.args.parameters.join(', ');

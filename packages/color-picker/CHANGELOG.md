@@ -2,8 +2,20 @@
 
 https://github.com/thomaslindstrom/color-picker
 
+## v2.2.0, v2.2.1, v2.2.2
+- Remove opening animation due to glitches in the UI and the `tool-bar` package
+
+### v2.2.3
+- Improve stylus variable lookup
+
+### v2.2.4
+- Fix deprecation warnings
+
 ## v2.1.0
 - Expose opening the `color-picker` as a service
+
+### v2.1.1
+- [Probably fix](https://github.com/thomaslindstrom/color-picker/commit/a0a3c43afac9407ccbc95733113014b695d1387a) [the one bug report that has been occurring over and over again](https://github.com/thomaslindstrom/color-picker/issues/114) for the past half year or so
 
 ## v2.0.0
 - Completely rewritten source code

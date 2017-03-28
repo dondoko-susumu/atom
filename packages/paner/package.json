@@ -1,0 +1,85 @@
+{
+  "_args": [
+    [
+      {
+        "raw": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117228-86441-1c9t23k/package.tgz",
+        "scope": null,
+        "escapedName": null,
+        "name": null,
+        "rawSpec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117228-86441-1c9t23k/package.tgz",
+        "spec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117228-86441-1c9t23k/package.tgz",
+        "type": "local"
+      },
+      "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/apm-install-dir-117228-86441-mj9whd"
+    ]
+  ],
+  "_from": "../d-117228-86441-1c9t23k/package.tgz",
+  "_id": "paner@0.4.0",
+  "_inCache": true,
+  "_installable": true,
+  "_location": "/paner",
+  "_phantomChildren": {},
+  "_requested": {
+    "raw": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117228-86441-1c9t23k/package.tgz",
+    "scope": null,
+    "escapedName": null,
+    "name": null,
+    "rawSpec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117228-86441-1c9t23k/package.tgz",
+    "spec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117228-86441-1c9t23k/package.tgz",
+    "type": "local"
+  },
+  "_requiredBy": [
+    "#USER"
+  ],
+  "_resolved": "file:../d-117228-86441-1c9t23k/package.tgz",
+  "_shasum": "e6993228d2bd7b112f8ecc1aab881f680f53bf7e",
+  "_shrinkwrap": null,
+  "_spec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117228-86441-1c9t23k/package.tgz",
+  "_where": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/apm-install-dir-117228-86441-mj9whd",
+  "activationCommands": {
+    "atom-workspace": [
+      "paner:maximize",
+      "paner:swap-item",
+      "paner:send-item",
+      "paner:merge-item",
+      "paner:swap-pane",
+      "paner:very-top",
+      "paner:very-bottom",
+      "paner:very-left",
+      "paner:very-right",
+      "paner:split-up",
+      "paner:split-down",
+      "paner:split-right",
+      "paner:split-left"
+    ]
+  },
+  "bugs": {
+    "url": "https://github.com/t9md/atom-paner/issues"
+  },
+  "configSchema": {
+    "debug": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "dependencies": {
+    "underscore-plus": "^1.6.6"
+  },
+  "description": "Pane manipulation helper",
+  "devDependencies": {},
+  "engines": {
+    "atom": ">=0.174.0 <2.0.0"
+  },
+  "homepage": "https://github.com/t9md/atom-paner#readme",
+  "license": "MIT",
+  "main": "./lib/main",
+  "name": "paner",
+  "optionalDependencies": {},
+  "readme": "# Paner [![Build Status](https://travis-ci.org/t9md/atom-paner.svg)](https://travis-ci.org/t9md/atom-paner)\n\nMissing pane manipulation utilities.\n\n![gif](https://raw.githubusercontent.com/t9md/t9md/4407eb697d1f83a8ce6a16ce096a98a270980c3b/img/atom-paner.gif)\n\n# Feature\n\nAlthough this package provide several utility command, the killer feature is move-to-very-xxx command.\n\n- move to VERY top/bottom/right/left: Move Pane to **very** top, bottom, right, left like Vim's `ctrl-w H` and its cousin.\n- Swap pane item with adjacent pane like Vim's `ctrl-w x`. Adjacent means choose swap `target` within same PaneAxis(`horizontal` or `vertical`).\n- Maximize: Maximize pane. Well know as **Zen mode**. Automatically exit Maximized mode if Active Pane changed.\n- Split with synching scroll state of original pane item.\n\n# Commands\n\n## Move pane to VERY far direction\n\n- `paner:very-top`: Move pane to very top position.\n- `paner:very-bottom`: Move pane to very bottom position.\n- `paner:very-right`: Move pane to very right position.\n- `paner:very-left`: Move pane to very left position.\n\n## Swap Pane\n- `paner:swap-pane`: Swap pane with adjacent pane.\n\n## Pane item manipulation\n\n- `paner:swap-item`: Swap item with adjacent pane's.\n- `paner:send-item`: Send active item to adjacent Pane.\n- `paner:merge-item`: Same as `paner:send-item` but it activate target pane.\n\n## Zen-mode\n\n- `paner:maximize`: Maximize or unMaximize current pane item.\n\n## Split with keeping scroll ratio\n\n- `paner:split-up`: Keep scroll state for newly opened editor so you won't loose sight of cursor.\n- `paner:split-down`: Keep scroll state for newly opened editor.\n- `paner:split-right`: Keep scroll state for newly opened editor.\n- `paner:split-left`: Keep scroll state for newly opened editor.\n\n# Keymap example.\n\nNo default keymap.\n\n* For normal user.\n\n```coffeescript\n'atom-workspace:not([mini])':\n  'cmd-k x': 'paner:swap-item'\n  'cmd-k X': 'paner:send-item'\n  'cmd-enter': 'paner:maximize'\n  'cmd-k cmd-up': 'paner:very-top'\n  'cmd-k cmd-down': 'paner:very-bottom'\n  'cmd-k cmd-left': 'paner:very-left'\n  'cmd-k cmd-right': 'paner:very-right'\n\n  'cmd-k up': 'paner:split-up'\n  'cmd-k down': 'paner:split-down'\n  'cmd-k left': 'paner:split-left'\n  'cmd-k right': 'paner:split-right'\n```\n\n* [vim-mode-plus](https://atom.io/packages/vim-mode-plus) user.\n\nIf you want to manipulate pane which is not instance of TextEdior(e.g. settings-view), you need to set keymap on `atom-workspace` not on `atom-text-editor`.\n\n```coffeescript\n'atom-text-editor.vim-mode-plus.normal-mode':\n  'ctrl-w x': 'paner:swap-pane'\n  'ctrl-w X': 'paner:send-item'\n  # 'ctrl-w enter': 'paner:maximize' # maximize feature is already bundled in vmp\n  'ctrl-w K': 'paner:very-top'\n  'ctrl-w J': 'paner:very-bottom'\n  'ctrl-w H': 'paner:very-left'\n  'ctrl-w L': 'paner:very-right'\n  'ctrl-w v': 'paner:split-left'\n```\n\n* Mine.\n\n```coffeescript\n'atom-workspace:not([mini])':\n  'cmd-x': 'paner:swap-pane'\n  'cmd-X': 'paner:send-item'\n  'cmd-K': 'paner:very-top'\n  'cmd-J': 'paner:very-bottom'\n  'cmd-H': 'paner:very-left'\n  'cmd-L': 'paner:very-right'\n\n'atom-text-editor.vim-mode-plus.normal-mode':\n  # Override default cmd-L(editor:split-selections-into-lines)\n  'cmd-L': 'paner:very-right'\n```\n",
+  "readmeFilename": "README.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/t9md/atom-paner.git"
+  },
+  "version": "0.4.0"
+}
