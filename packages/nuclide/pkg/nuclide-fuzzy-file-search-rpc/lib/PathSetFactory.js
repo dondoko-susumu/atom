@@ -16,13 +16,13 @@ let getFilesFromRepo = (() => {
       return s.length > 0;
     });
 
-    const fileLists = yield Promise.all(subRoots.map(function (subRoot) {
+    const fileLists = yield (0, (_promise || _load_promise()).asyncLimit)(subRoots, 20, function (subRoot) {
       return getFilesFromGit((_nuclideUri || _load_nuclideUri()).default.join(localDirectory, subRoot)).then(function (files) {
         return files.map(function (file) {
           return (_nuclideUri || _load_nuclideUri()).default.join(subRoot, file);
         });
       });
-    }));
+    });
 
     return [].concat(...fileLists);
   });
@@ -66,17 +66,13 @@ function _load_process() {
   return _process = require('../../commons-node/process');
 }
 
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+var _promise;
 
-/**
- * Copyright (c) 2015-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the license found in the LICENSE file in
- * the root directory of this source tree.
- *
- * 
- */
+function _load_promise() {
+  return _promise = require('../../commons-node/promise');
+}
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function getFilesFromCommand(command, args, localDirectory, transform) {
   return new Promise((resolve, reject) => {
@@ -111,7 +107,15 @@ function getFilesFromCommand(command, args, localDirectory, transform) {
       }
     });
   });
-}
+} /**
+   * Copyright (c) 2015-present, Facebook, Inc.
+   * All rights reserved.
+   *
+   * This source code is licensed under the license found in the LICENSE file in
+   * the root directory of this source tree.
+   *
+   * 
+   */
 
 function getTrackedHgFiles(localDirectory) {
   return getFilesFromCommand('hg', ['locate', '--fullpath', '--include', '.'], localDirectory, filePath => filePath.slice(localDirectory.length + 1));

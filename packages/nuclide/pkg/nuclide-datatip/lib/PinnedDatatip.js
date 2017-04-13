@@ -13,6 +13,12 @@ var _reactDom = _interopRequireDefault(require('react-dom'));
 
 var _rxjsBundlesRxMinJs = require('rxjs/bundles/Rx.min.js');
 
+var _classnames;
+
+function _load_classnames() {
+  return _classnames = _interopRequireDefault(require('classnames'));
+}
+
 var _DatatipComponent;
 
 function _load_DatatipComponent() {
@@ -21,15 +27,17 @@ function _load_DatatipComponent() {
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-const LINE_END_MARGIN = 20; /**
-                             * Copyright (c) 2015-present, Facebook, Inc.
-                             * All rights reserved.
-                             *
-                             * This source code is licensed under the license found in the LICENSE file in
-                             * the root directory of this source tree.
-                             *
-                             * 
-                             */
+/**
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the license found in the LICENSE file in
+ * the root directory of this source tree.
+ *
+ * 
+ */
+
+const LINE_END_MARGIN = 20;
 
 let _mouseMove$;
 function documentMouseMove$() {
@@ -50,14 +58,9 @@ function documentMouseUp$() {
 class PinnedDatatip {
 
   constructor(datatip, editor, onDispose) {
-    const {
-      component,
-      range
-    } = datatip;
     this._subscriptions = new _atom.CompositeDisposable();
     this._subscriptions.add(new _atom.Disposable(() => onDispose(this)));
-    this._range = range;
-    this._component = component;
+    this._datatip = datatip;
     this._editor = editor;
     this._marker = null;
     this._rangeDecoration = null;
@@ -151,38 +154,36 @@ class PinnedDatatip {
   _updateHostElementPosition() {
     const {
       _editor,
-      _range,
+      _datatip,
       _hostElement,
       _offset
     } = this;
+    const { range } = _datatip;
     const charWidth = _editor.getDefaultCharWidth();
-    const lineLength = _editor.getBuffer().getLines()[_range.start.row].length;
+    const lineLength = _editor.getBuffer().getLines()[range.start.row].length;
     _hostElement.style.display = 'block';
     _hostElement.style.top = -_editor.getLineHeightInPixels() + _offset.y + 'px';
-    _hostElement.style.left = (lineLength - _range.end.column) * charWidth + LINE_END_MARGIN + _offset.x + 'px';
+    _hostElement.style.left = (lineLength - range.end.column) * charWidth + LINE_END_MARGIN + _offset.x + 'px';
   }
 
   render() {
     const {
       _editor,
-      _range,
-      _component: ProvidedComponent,
+      _datatip,
       _hostElement,
       _isDragging,
       _isHovering
     } = this;
     this._updateHostElementPosition();
-    _reactDom.default.render(_react.default.createElement(
-      (_DatatipComponent || _load_DatatipComponent()).DatatipComponent,
-      {
-        action: (_DatatipComponent || _load_DatatipComponent()).DATATIP_ACTIONS.CLOSE,
-        actionTitle: 'Close this datatip',
-        className: _isDragging ? 'nuclide-datatip-dragging' : '',
-        onActionClick: this._boundDispose,
-        onMouseDown: this._boundHandleMouseDown,
-        onClickCapture: this._boundHandleCapturedClick },
-      _react.default.createElement(ProvidedComponent, null)
-    ), _hostElement);
+    _reactDom.default.render(_react.default.createElement((_DatatipComponent || _load_DatatipComponent()).DatatipComponent, {
+      action: (_DatatipComponent || _load_DatatipComponent()).DATATIP_ACTIONS.CLOSE,
+      actionTitle: 'Close this datatip',
+      className: (0, (_classnames || _load_classnames()).default)(_isDragging ? 'nuclide-datatip-dragging' : '', 'nuclide-datatip-pinned'),
+      datatip: _datatip,
+      onActionClick: this._boundDispose,
+      onMouseDown: this._boundHandleMouseDown,
+      onClickCapture: this._boundHandleCapturedClick
+    }), _hostElement);
 
     let rangeClassname = 'nuclide-datatip-highlight-region';
     if (_isHovering) {
@@ -190,7 +191,7 @@ class PinnedDatatip {
     }
 
     if (this._marker == null) {
-      const marker = _editor.markBufferRange(_range, { invalidate: 'never' });
+      const marker = _editor.markBufferRange(_datatip.range, { invalidate: 'never' });
       this._marker = marker;
       _editor.decorateMarker(marker, {
         type: 'overlay',

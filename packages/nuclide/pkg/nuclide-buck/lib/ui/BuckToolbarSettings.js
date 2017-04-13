@@ -58,14 +58,15 @@ class BuckToolbarSettings extends _react.default.Component {
 
   constructor(props) {
     super(props);
-    const { arguments: args, runArguments } = props.settings;
+    const { buildArguments, runArguments } = props.settings;
     this.state = {
-      arguments: args == null ? '' : (0, (_shellQuote || _load_shellQuote()).quote)(args),
+      buildArguments: buildArguments == null ? '' : (0, (_shellQuote || _load_shellQuote()).quote)(buildArguments),
       runArguments: runArguments == null ? '' : (0, (_shellQuote || _load_shellQuote()).quote)(runArguments)
     };
   }
 
   render() {
+    const extraSettingsUi = this.props.platformProviderSettings != null ? this.props.platformProviderSettings.ui : null;
     return _react.default.createElement(
       (_Modal || _load_Modal()).Modal,
       { onDismiss: this.props.onDismiss },
@@ -92,13 +93,13 @@ class BuckToolbarSettings extends _react.default.Component {
           _react.default.createElement(
             'label',
             null,
-            'Buck Arguments:'
+            'Build Arguments:'
           ),
           _react.default.createElement((_AtomInput || _load_AtomInput()).AtomInput, {
             tabIndex: '0',
-            initialValue: this.state.arguments,
-            placeholderText: 'Extra arguments to Buck (e.g. --num-threads 4)',
-            onDidChange: this._onArgsChange.bind(this),
+            initialValue: this.state.buildArguments,
+            placeholderText: 'Extra arguments to Buck itself (e.g. --num-threads 4)',
+            onDidChange: this._onBuildArgsChange.bind(this),
             onConfirm: this._onSave.bind(this)
           }),
           _react.default.createElement(
@@ -116,7 +117,8 @@ class BuckToolbarSettings extends _react.default.Component {
               onDidChange: this._onRunArgsChange.bind(this),
               onConfirm: this._onSave.bind(this)
             })
-          )
+          ),
+          extraSettingsUi
         ),
         _react.default.createElement(
           'div',
@@ -142,8 +144,8 @@ class BuckToolbarSettings extends _react.default.Component {
     );
   }
 
-  _onArgsChange(args) {
-    this.setState({ arguments: args });
+  _onBuildArgsChange(args) {
+    this.setState({ buildArguments: args });
   }
 
   _onRunArgsChange(args) {
@@ -153,11 +155,16 @@ class BuckToolbarSettings extends _react.default.Component {
   _onSave() {
     try {
       this.props.onSave({
-        arguments: (0, (_string || _load_string()).shellParse)(this.state.arguments),
+        buildArguments: (0, (_string || _load_string()).shellParse)(this.state.buildArguments),
         runArguments: (0, (_string || _load_string()).shellParse)(this.state.runArguments)
       });
     } catch (err) {
-      atom.notifications.addError('Could not parse arguments', { detail: err.stack });
+      atom.notifications.addError('Could not parse arguments', {
+        detail: err.stack
+      });
+    }
+    if (this.props.platformProviderSettings != null) {
+      this.props.platformProviderSettings.onSave();
     }
   }
 }

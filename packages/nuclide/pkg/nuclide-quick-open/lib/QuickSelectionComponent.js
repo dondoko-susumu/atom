@@ -96,7 +96,7 @@ class QuickSelectionComponent extends _react.default.Component {
     this._subscriptions = new (_UniversalDisposable || _load_UniversalDisposable()).default();
 
     const initialProviderName = this.props.searchResultManager.getActiveProviderName();
-    const initialActiveTab = this.props.searchResultManager.getProviderByName(initialProviderName);
+    const initialActiveTab = this.props.searchResultManager.getProviderSpecByName(initialProviderName);
     const initialQuery = this.props.searchResultManager.getLastQuery() || '';
     const initialResults = this.props.searchResultManager.getResults(initialQuery, initialProviderName);
     const topOuterResult = (0, (_searchResultHelpers || _load_searchResultHelpers()).getOuterResults)('top', initialResults);
@@ -156,11 +156,11 @@ class QuickSelectionComponent extends _react.default.Component {
         this.props.quickSelectionActions.query(query);
       });
     } else {
-      const activeProvider = this.props.searchResultManager.getProviderByName(nextProviderName);
+      const activeProviderSpec = this.props.searchResultManager.getProviderSpecByName(nextProviderName);
       const lastResults = this.props.searchResultManager.getResults(this.refs.queryInput.getText(), nextProviderName);
-      this._getTextEditor().setPlaceholderText(activeProvider.prompt);
+      this._getTextEditor().setPlaceholderText(activeProviderSpec.prompt);
       this.setState({
-        activeTab: activeProvider,
+        activeTab: activeProviderSpec,
         resultsByService: lastResults
       }, () => {
         process.nextTick(() => {

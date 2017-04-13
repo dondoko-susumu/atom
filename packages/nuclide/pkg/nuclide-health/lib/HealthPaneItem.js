@@ -64,7 +64,7 @@ class HealthPaneItem extends _react.default.Component {
   }
 
   getDefaultLocation() {
-    return 'pane';
+    return 'center';
   }
 
   render() {

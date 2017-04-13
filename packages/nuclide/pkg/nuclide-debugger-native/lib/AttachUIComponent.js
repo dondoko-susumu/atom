@@ -101,6 +101,7 @@ class AttachUIComponent extends _react.default.Component {
     this._updateAttachTargetList = this._updateAttachTargetList.bind(this);
     this._updateList = this._updateList.bind(this);
     this._handleSort = this._handleSort.bind(this);
+    this._targetListUpdating = false;
     this.state = {
       targetListChangeDisposable: this.props.store.onAttachTargetListChanged(this._updateList),
       attachTargetInfos: [],
@@ -128,6 +129,7 @@ class AttachUIComponent extends _react.default.Component {
 
   _updateList() {
     const newSelectedTarget = this.state.selectedAttachTarget == null ? null : this._getAttachTargetOfPid(this.state.selectedAttachTarget.pid);
+    this._targetListUpdating = false;
     this.setState({
       attachTargetInfos: this.props.store.getAttachTargetInfos(),
       selectedAttachTarget: newSelectedTarget
@@ -251,7 +253,10 @@ class AttachUIComponent extends _react.default.Component {
 
   _updateAttachTargetList() {
     // Fire and forget.
-    this.props.actions.updateAttachTargetList();
+    if (!this._targetListUpdating) {
+      this._targetListUpdating = true;
+      this.props.actions.updateAttachTargetList();
+    }
   }
 
   _attachToProcess() {

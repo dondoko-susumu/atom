@@ -124,7 +124,7 @@ class DiagnosticsPanel extends _react.default.Component {
 
     return _react.default.createElement(
       'div',
-      { style: { display: 'flex', flex: 1, flexDirection: 'column' } },
+      { style: { display: 'flex', flex: 1, flexDirection: 'column', width: '100%' } },
       linterWarning,
       _react.default.createElement(
         (_Toolbar || _load_Toolbar()).Toolbar,
@@ -153,7 +153,7 @@ class DiagnosticsPanel extends _react.default.Component {
             { className: 'inline-block' },
             _react.default.createElement((_Checkbox || _load_Checkbox()).Checkbox, {
               checked: this.props.showTraces,
-              label: 'Show full diagnostic traces',
+              label: 'Full description',
               onChange: this._onShowTracesChange
             })
           ),
@@ -162,7 +162,7 @@ class DiagnosticsPanel extends _react.default.Component {
             { className: 'inline-block' },
             _react.default.createElement((_Checkbox || _load_Checkbox()).Checkbox, {
               checked: this.props.filterByActiveTextEditor,
-              label: 'Show only diagnostics for current file',
+              label: 'Current file only',
               onChange: this._onFilterByActiveTextEditorChange
             })
           ),

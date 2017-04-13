@@ -3,11 +3,18 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+exports.HunkDiff = undefined;
 
 var _AtomTextEditor;
 
 function _load_AtomTextEditor() {
   return _AtomTextEditor = require('./AtomTextEditor');
+}
+
+var _nullthrows;
+
+function _load_nullthrows() {
+  return _nullthrows = _interopRequireDefault(require('nullthrows'));
 }
 
 var _string;
@@ -21,6 +28,12 @@ var _atom = require('atom');
 var _react = _interopRequireDefault(require('react'));
 
 var _reactDom = _interopRequireDefault(require('react-dom'));
+
+var _Section;
+
+function _load_Section() {
+  return _Section = require('./Section');
+}
 
 var _UniversalDisposable;
 
@@ -50,6 +63,25 @@ function getHighlightClass(type) {
   return null;
 }
 
+const NBSP = '\xa0';
+const GutterElement = props => {
+  const {
+    lineNumber,
+    gutterWidth
+  } = props;
+  const fillWidth = gutterWidth - String(lineNumber).length;
+  // Paralleling the original line-number implementation,
+  // pad the line number with leading spaces.
+  const filler = fillWidth > 0 ? new Array(fillWidth).fill(NBSP).join('') : '';
+  // Attempt to reuse the existing line-number styles.
+  return _react.default.createElement(
+    'div',
+    { className: 'line-number' },
+    filler,
+    lineNumber
+  );
+};
+
 class HunkDiff extends _react.default.Component {
 
   constructor(props) {
@@ -58,10 +90,40 @@ class HunkDiff extends _react.default.Component {
   }
 
   componentDidMount() {
-    this._createLineMarkers(this.refs.editor.getModel());
+    const editor = (0, (_nullthrows || _load_nullthrows()).default)(this.editor);
+    this._createLineMarkers(editor);
+    this._createLineNumbers(editor);
   }
 
-  // This is a read-only component– no need to update the underlying TextEditor.
+  componentWillReceiveProps(nextProps) {
+    const {
+      hunk,
+      grammar
+    } = nextProps;
+    const changes = hunk.changes;
+    const prevHunk = this.props.hunk;
+    const editor = (0, (_nullthrows || _load_nullthrows()).default)(this.editor);
+
+    const newText = changes.map(change => change.content.slice(1)).join('\n');
+    const oldText = prevHunk.changes.map(change => change.content.slice(1)).join('\n');
+    const oldGrammar = this.props.grammar;
+
+    if (newText === oldText && grammar === oldGrammar) {
+      return;
+    }
+
+    if (newText !== oldText) {
+      editor.setText(newText);
+    }
+    if (grammar !== oldGrammar) {
+      editor.setGrammar(grammar);
+    }
+    this._disposables.dispose();
+    this._disposables = new (_UniversalDisposable || _load_UniversalDisposable()).default();
+    this._createLineMarkers(editor);
+    this._createLineNumbers(editor);
+  }
+
   shouldComponentUpdate(nextProps) {
     return false;
   }
@@ -70,21 +132,56 @@ class HunkDiff extends _react.default.Component {
     this._disposables.dispose();
   }
 
+  // Line numbers are contiguous, but have a random starting point, so we can't use the
+  // default line-number gutter.
+  _createLineNumbers(editor) {
+    const changeCount = this.props.hunk.changes.length;
+    const initialOffset = this.props.hunk.newStart;
+    const maxDisplayLineNumber = initialOffset + changeCount - 1;
+    // The maximum required gutter width for this hunk, in characters:
+    const gutterWidth = String(maxDisplayLineNumber).length;
+    const suffix = gutterWidth > 0 && gutterWidth < 5 ? `-w${gutterWidth}` : '';
+    const gutter = editor.addGutter({
+      name: `nuclide-ui-file-changes-line-number-gutter${suffix}`
+    });
+    let deletedLinesInSection = 0;
+    let deletedLines = 0;
+    for (let line = 0; line < changeCount; line++) {
+      if (this.props.hunk.changes[line].type === 'del') {
+        deletedLinesInSection++;
+      } else {
+        deletedLines += deletedLinesInSection;
+        deletedLinesInSection = 0;
+      }
+      const displayLine = line + initialOffset - deletedLines;
+      const item = this._createGutterItem(displayLine, gutterWidth);
+      const marker = editor.markBufferPosition([line, 0], { invalidate: 'touch' });
+      gutter.decorateMarker(marker, {
+        type: 'gutter',
+        item
+      });
+      this._disposables.add(() => {
+        _reactDom.default.unmountComponentAtNode(item);
+        marker.destroy();
+      });
+    }
+    this._disposables.add(() => {
+      gutter.destroy();
+    });
+  }
+
+  _createGutterItem(lineNumber, gutterWidthInCharacters) {
+    const item = document.createElement('div');
+    _reactDom.default.render(_react.default.createElement(GutterElement, { lineNumber: lineNumber, gutterWidth: gutterWidthInCharacters }), item);
+    return item;
+  }
+
   /**
    * @param lineNumber A buffer line number to be highlighted.
    * @param type The type of highlight to be applied to the line.
    *             Could be a value of: ['insert', 'delete'].
    */
   _createLineMarkers(editor) {
-    let gutter;
-    if (this.props.checkboxFactory != null) {
-      gutter = editor.addGutter({ name: 'checkboxes' });
-      this._disposables.add(() => {
-        if (gutter) {
-          gutter.destroy();
-        }
-      });
-    }
     let hunkIndex = 0;
     for (const hunkChanges of this.props.hunk.changes) {
       const lineNumber = hunkIndex++;
@@ -99,24 +196,6 @@ class HunkDiff extends _react.default.Component {
         type: 'highlight',
         class: className
       });
-
-      if (gutter) {
-        if (!(this.props.checkboxFactory != null)) {
-          throw new Error('Invariant violation: "this.props.checkboxFactory != null"');
-        }
-
-        const checkbox = this.props.checkboxFactory(this.props.hunk.content, lineNumber);
-        const item = document.createElement('div');
-        _reactDom.default.render(checkbox, item);
-        const gutterDecoration = gutter.decorateMarker(marker, {
-          type: 'gutter',
-          item
-        });
-        gutterDecoration.onDidDestroy(() => _reactDom.default.unmountComponentAtNode(item));
-        this._disposables.add(() => {
-          gutterDecoration.destroy();
-        });
-      }
 
       this._disposables.add(() => {
         decoration.destroy();
@@ -138,15 +217,12 @@ class HunkDiff extends _react.default.Component {
     const textBuffer = new _atom.TextBuffer();
     textBuffer.setText(text);
 
-    let checkbox;
-    if (this.props.checkboxFactory != null) {
-      checkbox = this.props.checkboxFactory(content);
-    }
     return _react.default.createElement(
-      'div',
-      { key: content },
-      checkbox,
-      content,
+      (_Section || _load_Section()).Section,
+      {
+        collapsable: this.props.collapsable,
+        headline: content,
+        size: 'medium' },
       _react.default.createElement((_AtomTextEditor || _load_AtomTextEditor()).AtomTextEditor, {
         autoGrow: true,
         className: 'nuclide-ui-hunk-diff-text-editor',
@@ -154,62 +230,94 @@ class HunkDiff extends _react.default.Component {
         grammar: grammar,
         gutterHidden: true,
         readOnly: true,
-        ref: 'editor',
+        ref: editorRef => {
+          this.editor = editorRef && editorRef.getModel();
+        },
         textBuffer: textBuffer
       })
     );
   }
 }
 
-/* Renders changes to a single file. */
+exports.HunkDiff = HunkDiff; /* Renders changes to a single file. */
+
 class FileChanges extends _react.default.Component {
 
   render() {
     const { diff } = this.props;
     const {
-      to: fileName,
+      additions,
+      annotation,
       chunks,
       deletions,
-      additions
+      to: fileName
     } = diff;
     const grammar = atom.grammars.selectGrammar(fileName, '');
-    const hunks = chunks.map(chunk => _react.default.createElement(HunkDiff, {
-      key: chunk.content,
-      grammar: grammar,
-      hunk: chunk,
-      checkboxFactory: this.props.checkboxFactory && this.props.checkboxFactory.bind(null, fileName)
-    }));
-    let checkbox;
-    if (this.props.checkboxFactory != null) {
-      checkbox = this.props.checkboxFactory(fileName);
+    const hunks = [];
+    let i = 0;
+    for (const chunk of chunks) {
+      if (i > 0) {
+        hunks.push(_react.default.createElement('div', {
+          className: 'nuclide-ui-hunk-diff-spacer',
+          key: `spacer-${i}`
+        }));
+      }
+      hunks.push(_react.default.createElement(this.props.hunkComponentClass, {
+        collapsable: this.props.collapsable,
+        extraData: this.props.extraData,
+        key: chunk.oldStart,
+        grammar: grammar,
+        hunk: chunk
+      }));
+      i++;
     }
+    let annotationComponent;
+    if (annotation != null) {
+      annotationComponent = _react.default.createElement(
+        'span',
+        null,
+        annotation.split('\n').map((line, index) => _react.default.createElement(
+          'span',
+          { key: index },
+          line,
+          _react.default.createElement('br', null)
+        ))
+      );
+    }
+
+    const diffDetails = _react.default.createElement(
+      'span',
+      null,
+      annotationComponent,
+      _react.default.createElement('br', null),
+      additions,
+      ' ',
+      (0, (_string || _load_string()).pluralize)('addition', additions),
+      ',',
+      ' ',
+      deletions,
+      ' ',
+      (0, (_string || _load_string()).pluralize)('deletion', deletions)
+    );
+
+    const headline = _react.default.createElement(
+      'span',
+      null,
+      fileName,
+      _react.default.createElement('br', null),
+      diffDetails
+    );
+
     return _react.default.createElement(
-      'div',
-      { className: 'nuclide-ui-file-changes' },
-      _react.default.createElement(
-        'h3',
-        null,
-        checkbox,
-        fileName
-      ),
-      _react.default.createElement(
-        'div',
-        null,
-        additions,
-        ' ',
-        (0, (_string || _load_string()).pluralize)('addition', additions),
-        ',',
-        ' ',
-        deletions,
-        ' ',
-        (0, (_string || _load_string()).pluralize)('deletion', deletions)
-      ),
-      _react.default.createElement(
-        'div',
-        null,
-        hunks
-      )
+      (_Section || _load_Section()).Section,
+      {
+        collapsable: this.props.collapsable,
+        headline: headline },
+      hunks
     );
   }
 }
 exports.default = FileChanges;
+FileChanges.defaultProps = {
+  hunkComponentClass: HunkDiff
+};

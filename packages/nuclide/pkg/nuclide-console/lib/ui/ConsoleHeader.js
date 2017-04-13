@@ -178,7 +178,8 @@ class ConsoleHeader extends _react.default.Component {
             size: 'sm',
             width: 200,
             placeholderText: 'Filter',
-            onDidChange: this.props.onFilterTextChange
+            onDidChange: this.props.onFilterTextChange,
+            value: this.props.filterText
           }),
           _react.default.createElement(
             (_Button || _load_Button()).Button,
@@ -186,7 +187,8 @@ class ConsoleHeader extends _react.default.Component {
               className: 'nuclide-console-filter-regexp-button',
               size: (_Button || _load_Button()).ButtonSizes.SMALL,
               selected: this.props.enableRegExpFilter,
-              onClick: this._handleReToggleButtonClick },
+              onClick: this._handleReToggleButtonClick,
+              tooltip: { title: 'Use Regex' } },
             '.*'
           )
         )

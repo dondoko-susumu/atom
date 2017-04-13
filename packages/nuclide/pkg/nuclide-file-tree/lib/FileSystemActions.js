@@ -48,10 +48,10 @@ function _load_nuclideRemoteConnection() {
   return _nuclideRemoteConnection = require('../../nuclide-remote-connection');
 }
 
-var _vcs;
+var _nuclideVcsBase;
 
-function _load_vcs() {
-  return _vcs = require('../../commons-atom/vcs');
+function _load_nuclideVcsBase() {
+  return _nuclideVcsBase = require('../../nuclide-vcs-base');
 }
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
@@ -177,7 +177,7 @@ class FileSystemActions {
   }
 
   _getHgRepositoryForPath(filePath) {
-    const repository = (0, (_vcs || _load_vcs()).repositoryForPath)(filePath);
+    const repository = (0, (_nuclideVcsBase || _load_nuclideVcsBase()).repositoryForPath)(filePath);
     if (repository != null && repository.getType() === 'hg') {
       return repository;
     }

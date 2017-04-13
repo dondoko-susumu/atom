@@ -114,19 +114,20 @@ function _load_range() {
   return _range = require('../../commons-atom/range');
 }
 
+var _os = _interopRequireDefault(require('os'));
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-/**
- * Copyright (c) 2015-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the license found in the LICENSE file in
- * the root directory of this source tree.
- *
- * 
- */
+const DATATIP_PACKAGE_NAME = 'nuclide-debugger-datatip'; /**
+                                                          * Copyright (c) 2015-present, Facebook, Inc.
+                                                          * All rights reserved.
+                                                          *
+                                                          * This source code is licensed under the license found in the LICENSE file in
+                                                          * the root directory of this source tree.
+                                                          *
+                                                          * 
+                                                          */
 
-const DATATIP_PACKAGE_NAME = 'nuclide-debugger-datatip';
 const NUX_NEW_DEBUGGER_UI_ID = 4377;
 const GK_NEW_DEBUGGER_UI_NUX = 'mp_nuclide_new_debugger_ui';
 const NUX_NEW_DEBUGGER_UI_NAME = 'nuclide_new_debugger_ui';
@@ -253,6 +254,8 @@ class Activation {
     }), atom.commands.add('atom-workspace', {
       'nuclide-debugger:toggle-breakpoint': this._toggleBreakpoint.bind(this)
     }), atom.commands.add('atom-workspace', {
+      'nuclide-debugger:toggle-breakpoint-enabled': this._toggleBreakpointEnabled.bind(this)
+    }), atom.commands.add('atom-workspace', {
       'nuclide-debugger:toggle-launch-attach': this._toggleLaunchAttachDialog.bind(this)
     }), atom.commands.add('atom-workspace', {
       'nuclide-debugger:remove-all-breakpoints': this._deleteAllBreakpoints.bind(this)
@@ -264,6 +267,8 @@ class Activation {
       'nuclide-debugger:run-to-location': this._runToLocation.bind(this)
     }), atom.commands.add('.nuclide-debugger-root', {
       'nuclide-debugger:copy-debugger-expression-value': this._copyDebuggerExpressionValue.bind(this)
+    }), atom.commands.add('.nuclide-debugger-root', {
+      'nuclide-debugger:copy-debugger-callstack': this._copyDebuggerCallstack.bind(this)
     }),
 
     // Context Menu Items.
@@ -275,6 +280,10 @@ class Activation {
         label: 'Remove All Breakpoints',
         command: 'nuclide-debugger:remove-all-breakpoints'
       }],
+      '.nuclide-debugger-callstack-table': [{
+        label: 'Copy Callstack',
+        command: 'nuclide-debugger:copy-debugger-callstack'
+      }],
       '.nuclide-debugger-expression-value-list .list-item': [{
         label: 'Copy',
         command: 'nuclide-debugger:copy-debugger-expression-value'
@@ -284,6 +293,9 @@ class Activation {
         submenu: [{
           label: 'Toggle Breakpoint',
           command: 'nuclide-debugger:toggle-breakpoint'
+        }, {
+          label: 'Toggle Breakpoint enabled/disabled',
+          command: 'nuclide-debugger:toggle-breakpoint-enabled'
         }, {
           label: 'Add to Watch',
           command: 'nuclide-debugger:add-to-watch'
@@ -368,10 +380,37 @@ class Activation {
     this._model.getBridge().stepOut();
   }
 
-  _toggleBreakpoint() {
+  _getLineForEvent(event, editorLine) {
+    const target = event ? event.target : null;
+    // toggleLine is the line the user clicked in the gutter next to, as opposed
+    // to the line the editor's cursor happens to be in. If this command was invoked
+    // from the menu, then the cursor position is the target line.
+    const eventLine = target ? parseInt(target.dataset.line, 10) : null;
+    if (eventLine == null || eventLine < 0 || isNaN(Number(eventLine))) {
+      // fall back to the line the cursor is on.
+      return editorLine;
+    }
+
+    return eventLine;
+  }
+
+  _toggleBreakpoint(event) {
     return (0, (_nuclideAnalytics || _load_nuclideAnalytics()).trackTiming)('nuclide-debugger-atom:toggleBreakpoint', () => {
       this._executeWithEditorPath((filePath, line) => {
-        this._model.getActions().toggleBreakpoint(filePath, line);
+        this._model.getActions().toggleBreakpoint(filePath, this._getLineForEvent(event, line));
+      });
+    });
+  }
+
+  _toggleBreakpointEnabled(event) {
+    return (0, (_nuclideAnalytics || _load_nuclideAnalytics()).trackTiming)('nuclide-debugger-atom:toggleBreakpointEnabled', () => {
+      this._executeWithEditorPath((filePath, line) => {
+        const bp = this._model.getBreakpointStore().getBreakpointAtLine(filePath, this._getLineForEvent(event, line));
+
+        if (bp) {
+          const { id, enabled } = bp;
+          this._model.getActions().updateBreakpointEnabled(id, !enabled);
+        }
       });
     });
   }
@@ -483,6 +522,20 @@ class Activation {
   _copyDebuggerExpressionValue(event) {
     const clickedElement = event.target;
     atom.clipboard.write(clickedElement.textContent);
+  }
+
+  _copyDebuggerCallstack(event) {
+    const callstackStore = this._model.getCallstackStore();
+    const callstack = callstackStore.getCallstack();
+    if (callstack) {
+      let callstackText = '';
+      callstack.forEach((item, i) => {
+        const path = (_nuclideUri || _load_nuclideUri()).default.basename(item.location.path.replace(/^[a-zA-Z]+:\/\//, ''));
+        callstackText += `${i}\t${item.name}\t${path}:${item.location.line}${_os.default.EOL}`;
+      });
+
+      atom.clipboard.write(callstackText.trim());
+    }
   }
 }
 
@@ -622,8 +675,7 @@ function provideRemoteControlService() {
 
 function consumeDatatipService(service) {
   const provider = createDatatipProvider();
-  service.addProvider(provider);
-  const disposable = new _atom.Disposable(() => service.removeProvider(provider));
+  const disposable = service.addProvider(provider);
 
   if (!activation) {
     throw new Error('Invariant violation: "activation"');

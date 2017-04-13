@@ -12,6 +12,12 @@ function _load_addTooltip() {
   return _addTooltip = _interopRequireDefault(require('../../nuclide-ui/add-tooltip'));
 }
 
+var _hideAllTooltips;
+
+function _load_hideAllTooltips() {
+  return _hideAllTooltips = _interopRequireDefault(require('../../nuclide-ui/hide-all-tooltips'));
+}
+
 var _nuclideAnalytics;
 
 function _load_nuclideAnalytics() {
@@ -41,17 +47,15 @@ function _load_classnames() {
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 // eslint-disable-next-line nuclide-internal/no-cross-atom-imports
-/**
- * Copyright (c) 2015-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the license found in the LICENSE file in
- * the root directory of this source tree.
- *
- * 
- */
-
-const BLAME_DECORATION_CLASS = 'blame-decoration';
+const BLAME_DECORATION_CLASS = 'blame-decoration'; /**
+                                                    * Copyright (c) 2015-present, Facebook, Inc.
+                                                    * All rights reserved.
+                                                    *
+                                                    * This source code is licensed under the license found in the LICENSE file in
+                                                    * the root directory of this source tree.
+                                                    *
+                                                    * 
+                                                    */
 
 let Avatar;
 try {
@@ -96,6 +100,10 @@ class BlameGutter {
 
     this._subscriptions.add(editor.onDidDestroy(() => {
       this._isEditorDestroyed = true;
+    }));
+    const editorView = atom.views.getView(editor);
+    this._subscriptions.add(editorView.onDidChangeScrollTop(() => {
+      (0, (_hideAllTooltips || _load_hideAllTooltips()).default)();
     }));
     this._fetchAndDisplayBlame();
   }

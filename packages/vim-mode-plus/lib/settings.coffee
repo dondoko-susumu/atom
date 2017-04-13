@@ -1,3 +1,5 @@
+{Disposable} = require 'atom'
+
 inferType = (value) ->
   switch
     when Number.isInteger(value) then 'integer'
@@ -21,21 +23,82 @@ class Settings
       @config[name].order = i
 
   get: (param) ->
-    if param is 'defaultRegister'
-      if @get('useClipboardAsDefaultRegister') then '*' else '"'
-    else
-      atom.config.get "#{@scope}.#{param}"
+    atom.config.get("#{@scope}.#{param}")
 
   set: (param, value) ->
-    atom.config.set "#{@scope}.#{param}", value
+    atom.config.set("#{@scope}.#{param}", value)
 
   toggle: (param) ->
     @set(param, not @get(param))
 
   observe: (param, fn) ->
-    atom.config.observe "#{@scope}.#{param}", fn
+    atom.config.observe("#{@scope}.#{param}", fn)
+
+  observeConditionalKeymaps: ->
+    conditionalKeymaps =
+      keymapUnderscoreToReplaceWithRegister:
+        'atom-text-editor.vim-mode-plus:not(.insert-mode)':
+          '_': 'vim-mode-plus:replace-with-register'
+      keymapCCToChangeInnerSmartWord:
+        'atom-text-editor.vim-mode-plus.operator-pending-mode.change-pending':
+          'c': 'vim-mode-plus:inner-smart-word'
+      keymapSemicolonToInnerAnyPairInOperatorPendingMode:
+        'atom-text-editor.vim-mode-plus.operator-pending-mode':
+          ';': 'vim-mode-plus:inner-any-pair'
+      keymapSemicolonToInnerAnyPairInVisualMode:
+        'atom-text-editor.vim-mode-plus.visual-mode':
+          ';': 'vim-mode-plus:inner-any-pair'
+      keymapBackslashToInnerCommentOrParagraphWhenToggleLineCommentsIsPending:
+        'atom-text-editor.vim-mode-plus.operator-pending-mode.toggle-line-comments-pending':
+          '/': 'vim-mode-plus:inner-comment-or-paragraph'
+
+    observeConditionalKeymap = (param) =>
+      keymapSource = "vim-mode-plus-conditional-keymap:#{param}"
+      disposable = @observe param, (newValue) ->
+        if newValue
+          atom.keymaps.add(keymapSource, conditionalKeymaps[param])
+        else
+          atom.keymaps.removeBindingsFromSource(keymapSource)
+
+      new Disposable ->
+        disposable.dispose()
+        atom.keymaps.removeBindingsFromSource(keymapSource)
+
+    # Return disposalbes to dispose config observation and conditional keymap.
+    return Object.keys(conditionalKeymaps).map (param) -> observeConditionalKeymap(param)
 
 module.exports = new Settings 'vim-mode-plus',
+  keymapUnderscoreToReplaceWithRegister:
+    default: false
+    description: """
+    Can: `_ i (` to replace inner-parenthesis with register's value<br>
+    Can: `_ i ;` to replace inner-any-pair if you enabled `keymapSemicolonToInnerAnyPairInOperatorPendingMode`<br>
+    Conflicts: `_`( `move-to-first-character-of-line-and-down` ) motion. Who use this??
+    """
+  keymapCCToChangeInnerSmartWord:
+    default: false
+    description: """
+    Can: `c c` to `change inner-smart-word`<br>
+    Conflicts: `c c`( change-current-line ) keystroke which is equivalent to `S` or `c i l` etc.
+    """
+  keymapSemicolonToInnerAnyPairInOperatorPendingMode:
+    default: false
+    description: """
+    Can: `c ;` to `change inner-any-pair`, Conflicts with original `;`( `repeat-find` ) motion.<br>
+    Conflicts: `;`( `repeat-find` ).
+    """
+  keymapSemicolonToInnerAnyPairInVisualMode:
+    default: false
+    description: """
+    Can: `v ;` to `select inner-any-pair`, Conflicts with original `;`( `repeat-find` ) motion.<br>L
+    Conflicts: `;`( `repeat-find` ).
+    """
+  keymapBackslashToInnerCommentOrParagraphWhenToggleLineCommentsIsPending:
+    default: false
+    description: """
+    Can: `g / /` to comment-in already commented region, `g / /` to comment-out paragraph.<br>
+    Conflicts: `/`( `search` ) motion only when `g /` is pending. you no longe can `g /` with search.
+    """
   setCursorToStartOfChangeOnUndoRedo: true
   setCursorToStartOfChangeOnUndoRedoStrategy:
     default: 'smart'
@@ -46,7 +109,13 @@ module.exports = new Settings 'vim-mode-plus',
     `simple`: Always work, but accuracy is not as good as `smart`.<br>
     """
   groupChangesWhenLeavingInsertMode: true
-  useClipboardAsDefaultRegister: false
+  useClipboardAsDefaultRegister: true
+  dontUpdateRegisterOnChangeOrSubstitute:
+    default: false
+    description: """
+    When set to `true` any `change` or `substitute` operation no longer update register content<br>
+    Affects `c`, `C`, `s`, `S` operator.
+    """
   startInInsertMode: false
   startInInsertModeScopes:
     default: []
@@ -65,10 +134,10 @@ module.exports = new Settings 'vim-mode-plus',
       To ignore "-"(minus) char in string like "identifier-1" use `(?:\\B-)?[0-9]+`
       """
   clearHighlightSearchOnResetNormalMode:
-    default: false
+    default: true
     description: 'Clear highlightSearch on `escape` in normal-mode'
   clearPersistentSelectionOnResetNormalMode:
-    default: false
+    default: true
     description: 'Clear persistentSelection on `escape` in normal-mode'
   charactersToAddSpaceOnSurround:
     default: []
@@ -90,7 +159,7 @@ module.exports = new Settings 'vim-mode-plus',
   useSmartcaseForSearchCurrentWord:
     default: false
     description: 'For `*` and `#`. Override `ignoreCaseForSearchCurrentWord`'
-  highlightSearch: false
+  highlightSearch: true
   highlightSearchExcludeScopes:
     default: []
     items: type: 'string'
@@ -157,8 +226,9 @@ module.exports = new Settings 'vim-mode-plus',
   statusBarModeStringStyle:
     default: 'short'
     enum: ['short', 'long']
-  devThrowErrorOnNonEmptySelectionInNormalMode:
-    default: false
-    description: "[Dev use] Throw error when non-empty selection was remained in normal-mode at the timing of operation finished"
   debug:
     default: false
+    description: "[Dev use]"
+  strictAssertion:
+    default: false
+    description: "[Dev use] to catche wired state in vmp-dev, enable this if you want help me"

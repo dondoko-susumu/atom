@@ -5,7 +5,9 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.registerPatchEditor = registerPatchEditor;
 exports.deregisterPatchEditor = deregisterPatchEditor;
-exports.clickCheckbox = clickCheckbox;
+exports.toggleFile = toggleFile;
+exports.toggleHunk = toggleHunk;
+exports.toggleLine = toggleLine;
 
 var _ActionTypes;
 
@@ -44,13 +46,34 @@ function deregisterPatchEditor(editorPath) {
   };
 }
 
-function clickCheckbox(editorPath, fileName, hunkOldStartLine, line) {
+function toggleFile(patchId, fileId) {
   return {
-    type: (_ActionTypes || _load_ActionTypes()).CLICK_CHECKBOX_ACTION,
+    type: (_ActionTypes || _load_ActionTypes()).TOGGLE_FILE_ACTION,
     payload: {
-      editorPath,
-      fileName,
-      hunkOldStartLine,
+      patchId,
+      fileId
+    }
+  };
+}
+
+function toggleHunk(patchId, fileId, hunkOldStart) {
+  return {
+    type: (_ActionTypes || _load_ActionTypes()).TOGGLE_HUNK_ACTION,
+    payload: {
+      patchId,
+      fileId,
+      hunkOldStart
+    }
+  };
+}
+
+function toggleLine(patchId, fileId, hunkOldStart, line) {
+  return {
+    type: (_ActionTypes || _load_ActionTypes()).TOGGLE_LINE_ACTION,
+    payload: {
+      patchId,
+      fileId,
+      hunkOldStart,
       line
     }
   };

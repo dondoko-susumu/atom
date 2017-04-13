@@ -27,10 +27,10 @@ function _load_goToLocation() {
   return _goToLocation = require('../../commons-atom/go-to-location');
 }
 
-var _textBuffer;
+var _nuclideRemoteConnection;
 
-function _load_textBuffer() {
-  return _textBuffer = require('../../commons-atom/text-buffer');
+function _load_nuclideRemoteConnection() {
+  return _nuclideRemoteConnection = require('../../nuclide-remote-connection');
 }
 
 var _AtomTextEditor;
@@ -78,7 +78,7 @@ class DefinitionPreviewView extends _react.default.Component {
 
   constructor(props) {
     super(props);
-    const buffer = props.definition != null ? (0, (_textBuffer || _load_textBuffer()).bufferForUri)(props.definition.path) : new _atom.TextBuffer();
+    const buffer = props.definition != null ? (0, (_nuclideRemoteConnection || _load_nuclideRemoteConnection()).bufferForUri)(props.definition.path) : new _atom.TextBuffer();
     const heightSetting = (_featureConfig || _load_featureConfig()).default.get('nuclide-definition-preview.editorHeight');
     let height = 50;
     if (heightSetting != null) {
@@ -106,7 +106,7 @@ class DefinitionPreviewView extends _react.default.Component {
       // the correct path if the new definition prop has a different path than the
       // currently loaded buffer.
       if (definition.path !== this.state.buffer.getPath()) {
-        this.setState({ buffer: (0, (_textBuffer || _load_textBuffer()).bufferForUri)(definition.path), oldBuffer: this.state.buffer });
+        this.setState({ buffer: (0, (_nuclideRemoteConnection || _load_nuclideRemoteConnection()).bufferForUri)(definition.path), oldBuffer: this.state.buffer });
       }
     } else {
       // A null definition has no associated file path, so make a new TextBuffer()

@@ -212,6 +212,7 @@ const LLDB_TARGET_TYPE = 'LLDB';
 const ANDROID_TARGET_TYPE = 'android';
 
 function getDeployBuildEvents(processStream, buckService, buckRoot, buildTarget, runArguments) {
+  const argString = runArguments.length === 0 ? '' : ` with arguments "${runArguments.join(' ')}"`;
   return processStream.filter(message => message.kind === 'exit' && message.exitCode === 0).switchMap(() => {
     return _rxjsBundlesRxMinJs.Observable.fromPromise(debugBuckTarget(buckService, buckRoot, buildTarget, runArguments)).map(path => ({
       type: 'log',
@@ -226,7 +227,7 @@ function getDeployBuildEvents(processStream, buckService, buckRoot, buildTarget,
       });
     }).startWith({
       type: 'log',
-      message: `Launching debugger for ${buildTarget}...`,
+      message: `Launching debugger for ${buildTarget}${argString}...`,
       level: 'log'
     }, {
       type: 'progress',

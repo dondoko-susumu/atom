@@ -131,6 +131,8 @@ class TestRunnerPanel extends _react.default.Component {
         runStopButton = _react.default.createElement(
           (_Button || _load_Button()).Button,
           {
+            size: (_Button || _load_Button()).ButtonSizes.SMALL,
+            className: 'inline-block',
             icon: 'primitive-square',
             buttonType: (_Button || _load_Button()).ButtonTypes.ERROR,
             onClick: this.props.onClickStop },
@@ -142,6 +144,8 @@ class TestRunnerPanel extends _react.default.Component {
         runStopButton = _react.default.createElement(
           (_Button || _load_Button()).Button,
           {
+            size: (_Button || _load_Button()).ButtonSizes.SMALL,
+            className: 'inline-block',
             icon: initialTest ? 'playback-play' : 'sync',
             buttonType: (_Button || _load_Button()).ButtonTypes.PRIMARY,
             disabled: this.isDisabled(),
@@ -214,11 +218,20 @@ class TestRunnerPanel extends _react.default.Component {
     let attachDebuggerCheckbox = null;
     if (this.props.attachDebuggerBeforeRunning != null) {
       attachDebuggerCheckbox = _react.default.createElement((_Checkbox || _load_Checkbox()).Checkbox, {
+        className: 'inline-block',
         checked: this.props.attachDebuggerBeforeRunning,
         label: 'Enable Debugger',
         onChange: this.props.onDebuggerCheckboxChanged
       });
     }
+
+    const running = this.props.executionState === TestRunnerPanel.ExecutionState.RUNNING;
+
+    const progressBar = running ? _react.default.createElement('progress', Object.assign({
+      className: 'inline-block',
+      max: '100',
+      title: 'Test progress'
+    }, progressAttrs)) : null;
 
     return _react.default.createElement(
       'div',
@@ -232,28 +245,22 @@ class TestRunnerPanel extends _react.default.Component {
           dropdown,
           runStopButton,
           attachDebuggerCheckbox,
-          _react.default.createElement((_Button || _load_Button()).Button, {
-            size: (_Button || _load_Button()).ButtonSizes.SMALL,
-            icon: 'trashcan',
-            className: 'trashcan inline-block',
-            disabled: this.isDisabled() || this.props.executionState === TestRunnerPanel.ExecutionState.RUNNING,
-            onClick: this.props.onClickClear,
-            title: 'Clear Output'
-          }),
           pathMsg
         ),
         _react.default.createElement(
           (_ToolbarRight || _load_ToolbarRight()).ToolbarRight,
           null,
           runMsg,
-          _react.default.createElement('progress', Object.assign({ className: 'inline-block', max: '100' }, progressAttrs)),
-          _react.default.createElement((_Button || _load_Button()).Button, {
-            onClick: this.props.onClickClose,
-            className: 'inline-block',
-            icon: 'x',
-            size: (_Button || _load_Button()).ButtonSizes.SMALL,
-            title: 'Close Panel'
-          })
+          progressBar,
+          _react.default.createElement(
+            (_Button || _load_Button()).Button,
+            {
+              size: (_Button || _load_Button()).ButtonSizes.SMALL,
+              className: 'inline-block',
+              disabled: this.isDisabled() || running,
+              onClick: this.props.onClickClear },
+            'Clear'
+          )
         )
       ),
       _react.default.createElement('div', { className: 'nuclide-test-runner-console', ref: 'paneContainer' })

@@ -213,7 +213,7 @@ class NewDebuggerView extends _react.default.PureComponent {
     const debugeeRunningNotice = mode !== (_DebuggerStore || _load_DebuggerStore()).DebuggerMode.RUNNING ? null : _react.default.createElement(
       'div',
       { className: 'nuclide-debugger-state-notice' },
-      'The debugee is currently running.'
+      'The debug target is currently running.'
     );
 
     const debugFlexContainer = _react.default.createElement(

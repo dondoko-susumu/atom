@@ -4,6 +4,9 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.RecentFilesProvider = undefined;
+
+var _asyncToGenerator = _interopRequireDefault(require('async-to-generator'));
+
 exports.setRecentFilesService = setRecentFilesService;
 
 var _nuclideUri;
@@ -103,7 +106,13 @@ const RecentFilesProvider = exports.RecentFilesProvider = {
     action: 'nuclide-recent-files-provider:toggle-provider'
   },
 
-  executeQuery(query) {
+  isEligibleForDirectories(directories) {
+    return (0, _asyncToGenerator.default)(function* () {
+      return true;
+    })();
+  },
+
+  executeQuery(query, directories) {
     return Promise.resolve(getRecentFilesMatching(query));
   },
 

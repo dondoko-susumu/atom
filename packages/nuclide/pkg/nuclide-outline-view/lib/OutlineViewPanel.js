@@ -48,7 +48,7 @@ class OutlineViewPanelState {
     return 'list-unordered';
   }
 
-  getPreferredInitialWidth() {
+  getPreferredWidth() {
     return 300;
   }
 
@@ -57,7 +57,7 @@ class OutlineViewPanelState {
   }
 
   getDefaultLocation() {
-    return 'right-panel';
+    return 'right';
   }
 
   didChangeVisibility(visible) {

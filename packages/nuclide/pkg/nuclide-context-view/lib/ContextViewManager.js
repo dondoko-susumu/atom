@@ -329,7 +329,7 @@ class ContextViewManager {
     return 'info';
   }
 
-  getPreferredInitialWidth() {
+  getPreferredWidth() {
     return 300;
   }
 
@@ -338,7 +338,7 @@ class ContextViewManager {
   }
 
   getDefaultLocation() {
-    return 'right-panel';
+    return 'right';
   }
 
   didChangeVisibility(visible) {

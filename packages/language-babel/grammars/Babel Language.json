@@ -2176,7 +2176,7 @@
       "comment": "Avoid < operator expressions as best we can using Zertosh's regex",
       "patterns": [
         {
-          "begin": "(?<=\\(|{|\\[|,|&&|\\|\\||\\?|:|=|=>|\\Wreturn|^return|\\Wdefault|\\Wvoid|^void|^)\\s*+(?=<[$_\\p{L}])",
+          "begin": "(?<=\\(|{|\\[|,|&&|\\|\\||\\?|:|=|=>|\\Wreturn|^return|\\Wyield|^yield|\\Wdefault|\\Wvoid|^void|^)\\s*+(?=<[$_\\p{L}])",
           "end": "(?=.)",
           "applyEndPatternLast": 1,
           "patterns": [
@@ -2309,18 +2309,6 @@
     },
     "jsx-evaluated-code": {
       "patterns": [
-        {
-          "name": "meta.embedded.expression.commented-out.jsx",
-          "contentName": "comment.embedded.jsx",
-          "begin": "^\\s*({/\\*)",
-          "end": "\\s*(\\*/})",
-          "beginCaptures": {
-            "1": { "name": "punctuation.section.embedded.begin.jsx" }
-          },
-          "endCaptures": {
-            "1": { "name": "punctuation.section.embedded.end.jsx" }
-          }
-        },
         {
           "name": "meta.embedded.expression.js",
           "contentName": "source.js.jsx",

@@ -16,10 +16,10 @@ function _load_classnames() {
   return _classnames = _interopRequireDefault(require('classnames'));
 }
 
-var _vcs;
+var _nuclideVcsBase;
 
-function _load_vcs() {
-  return _vcs = require('../commons-atom/vcs');
+function _load_nuclideVcsBase() {
+  return _nuclideVcsBase = require('../nuclide-vcs-base');
 }
 
 var _nuclideUri;
@@ -62,11 +62,11 @@ class ChangedFilesList extends _react.default.Component {
 
   _getFileClassname(file, fileChangeValue) {
     const { commandPrefix, rootPath, selectedFile } = this.props;
-    const repository = (0, (_vcs || _load_vcs()).repositoryForPath)(rootPath);
+    const repository = (0, (_nuclideVcsBase || _load_nuclideVcsBase()).repositoryForPath)(rootPath);
     return (0, (_classnames || _load_classnames()).default)('nuclide-file-changes-list-item', 'list-item', {
       selected: file === selectedFile,
       [`${commandPrefix}-file-entry`]: repository != null && repository.getType() === 'hg'
-    }, (_vcs || _load_vcs()).FileChangeStatusToTextColor[fileChangeValue]);
+    }, (_nuclideVcsBase || _load_nuclideVcsBase()).FileChangeStatusToTextColor[fileChangeValue]);
   }
 
   render() {
@@ -130,7 +130,7 @@ class ChangedFilesList extends _react.default.Component {
                 onClick: () => this.props.onFileChosen(filePath) },
               _react.default.createElement((_Icon || _load_Icon()).Icon, {
                 className: 'nuclide-file-changes-file-entry-icon',
-                icon: (_vcs || _load_vcs()).FileChangeStatusToIcon[fileChangeValue]
+                icon: (_nuclideVcsBase || _load_nuclideVcsBase()).FileChangeStatusToIcon[fileChangeValue]
               }),
               _react.default.createElement(
                 'span',

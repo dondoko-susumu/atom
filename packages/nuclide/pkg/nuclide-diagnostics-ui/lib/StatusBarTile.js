@@ -4,6 +4,18 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
+var _addTooltip;
+
+function _load_addTooltip() {
+  return _addTooltip = _interopRequireDefault(require('../../nuclide-ui/add-tooltip'));
+}
+
+var _Icon;
+
+function _load_Icon() {
+  return _Icon = require('../../nuclide-ui/Icon');
+}
+
 var _classnames;
 
 function _load_classnames() {
@@ -143,30 +155,47 @@ class StatusBarTileComponent extends _react.default.Component {
   }
 
   render() {
+    const errorCount = this.props.errorCount;
+    const warningCount = this.props.warningCount;
+    const hasErrors = errorCount > 0;
+    const hasWarnings = warningCount > 0;
     const errorClassName = (0, (_classnames || _load_classnames()).default)('nuclide-diagnostics-status-bar-highlight', {
-      'highlight': this.props.errorCount === 0,
-      'highlight-error': this.props.errorCount > 0
+      'text-error': hasErrors
     });
     const warningClassName = (0, (_classnames || _load_classnames()).default)('nuclide-diagnostics-status-bar-highlight', {
-      'highlight': this.props.warningCount === 0,
-      'highlight-warning': this.props.warningCount > 0
+      'text-warning': hasWarnings
     });
+    const errorLabel = hasErrors ? errorCount : 'No';
+    const errorSuffix = errorCount !== 1 ? 's' : '';
+    const warningLabel = hasWarnings ? warningCount : 'No';
+    const warningSuffix = warningCount !== 1 ? 's' : '';
 
     return _react.default.createElement(
       'span',
-      {
-        className: 'nuclide-diagnostics-highlight-group',
-        onClick: this._onClick,
-        title: 'Errors | Warnings' },
+      null,
       _react.default.createElement(
-        'span',
-        { className: errorClassName },
-        this.props.errorCount
+        'a',
+        {
+          className: errorClassName,
+          onClick: this._onClick,
+          ref: (0, (_addTooltip || _load_addTooltip()).default)({
+            title: `${errorLabel} error${errorSuffix}`,
+            placement: 'top'
+          }) },
+        _react.default.createElement((_Icon || _load_Icon()).Icon, { icon: 'stop' }),
+        errorCount
       ),
       _react.default.createElement(
-        'span',
-        { className: warningClassName },
-        this.props.warningCount
+        'a',
+        {
+          className: warningClassName,
+          onClick: this._onClick,
+          ref: (0, (_addTooltip || _load_addTooltip()).default)({
+            title: `${warningLabel} warning${warningSuffix}`,
+            placement: 'top'
+          }) },
+        _react.default.createElement((_Icon || _load_Icon()).Icon, { icon: 'alert' }),
+        warningCount
       )
     );
   }

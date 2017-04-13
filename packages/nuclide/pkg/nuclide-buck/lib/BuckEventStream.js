@@ -87,6 +87,9 @@ function getEventsFromSocket(socketStream) {
           type: 'progress',
           progress: message.progressValue
         });
+      case 'CompilerErrorEvent':
+        // TODO: forward suggestions to diagnostics as autofixes
+        return log(message.error, 'error');
     }
     return _rxjsBundlesRxMinJs.Observable.empty();
   }).catch(err => {

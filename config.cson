@@ -72,6 +72,7 @@
       "wrap-guide"
       "language-babel"
       "paner"
+      "vim-mode-plus"
     ]
     telemetryConsent: "limited"
     themes: [
@@ -92,6 +93,7 @@
   "go-plus":
     config:
       gopath: "~/.go"
+    currentPanelHeight: "10.252996005326231vh"
     format:
       tool: "gofmt"
     lint:
@@ -114,7 +116,7 @@
     jumpToImport: true
   linter: {}
   "linter-ui-default":
-    showPanel: true
+    panelHeight: 128
   minimap:
     plugins:
       "find-and-replace": true

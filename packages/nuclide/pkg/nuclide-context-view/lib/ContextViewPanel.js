@@ -33,7 +33,7 @@ const ContextViewPanel = exports.ContextViewPanel = props => {
       'p',
       null,
       props.locked ? _react.default.createElement((_Icon || _load_Icon()).Icon, { icon: 'lock' }) : null,
-      'Click on a symbol to see more information about it.'
+      'Click on a symbol (variable, function, type, etc) in an open file to see more information about it below.'
     ),
     props.children
   );

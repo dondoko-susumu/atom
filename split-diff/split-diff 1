@@ -1,181 +1,139 @@
-import React, {
-  Component,
-  PropTypes,
-} from 'react';
-
-import {
-  Image,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-
-export default class CardMedia extends Component {
-
-  static propTypes = {
-    style: PropTypes.object,
-    files: PropTypes.array,
-    title: PropTypes.string,
-    titleStyle: PropTypes.object,
-    onPress: PropTypes.func,
-    imageIconView: PropTypes.element,
-    imageCountStyle: PropTypes.object,
-  };
-
-  static defaultProps = {
-    style: {},
-    files: [],
-    title: '',
-  };
-
-  render() {
-    const {
-      style,
-      title,
-      titleStyle,
-      files,
-      onPress,
-      imageIconView,
-      imageCountStyle,
-    } = this.props;
-
-    return (
-      <View style={[styles.cardMedia, style]}>
-        {files.length === 1 &&
-          <View style={[styles.cardMediaImages, style, { flexDirection: 'row' }]}>
-            <Image
-              source={{ uri: `${files[0]}` }}
-              style={{ flex: 1 }}
-            />
-          </View>
-        }
-        {files.length === 2 &&
-          <View style={[styles.cardMediaImages, style, { flexDirection: 'row' }]}>
-            <Image
-              source={{ uri: `${files[0]}` }}
-              style={{ flex: 1 }}
-            />
-            <Image
-              source={{ uri: `${files[1]}` }}
-              style={{ flex: 1 }}
-            />
-          </View>
-        }
-        {files.length === 3 &&
-          <View style={[styles.cardMediaImages, style, { flexDirection: 'row' }]}>
-            <Image
-              source={{ uri: `${files[0]}` }}
-              style={{ flex: 2 }}
-            />
-            <View style={[style, { flex: 1, flexDirection: 'column' }]}>
-              <Image
-                source={{ uri: `${files[1]}` }}
-                style={{ flex: 1 }}
-              />
-              <Image
-                source={{ uri: `${files[2]}` }}
-                style={{ flex: 1 }}
-              />
-            </View>
-          </View>
-        }
-        {files.length >= 4 &&
-          <View style={[styles.cardMediaImages, style, { flexDirection: 'column' }]}>
-            <View style={[style, { flex: 1, flexDirection: 'row' }]}>
-              <Image
-                source={{ uri: `${files[0]}` }}
-                style={{ flex: 1 }}
-              />
-              <Image
-                source={{ uri: `${files[1]}` }}
-                style={{ flex: 1 }}
-              />
-            </View>
-            <View style={[style, { flex: 1, flexDirection: 'row' }]}>
-              <Image
-                source={{ uri: `${files[2]}` }}
-                style={{ flex: 1 }}
-              />
-              <Image
-                source={{ uri: `${files[3]}` }}
-                style={{ flex: 1 }}
-              />
-            </View>
-          </View>
-        }
-        {files.length <= 4 &&
-          <View style={styles.overlay}>
-            <Text
-              style={titleStyle}
-              numberOfLines={1}
-              ellipsizeMode={'tail'}
-              onPress={onPress}
-            >
-              {title}
-            </Text>
-          </View>
-        }
-        {files.length > 4 &&
-          <View style={[styles.overlay, { flex: 1, flexDirection: 'row', justifyContent: 'space-between' }]}>
-            <Text
-              style={[titleStyle, { flex: 1 }]}
-              numberOfLines={1}
-              ellipsizeMode={'tail'}
-              onPress={onPress}
-            >
-              {title}
-            </Text>
-            <View style={{ flexDirection: 'row' }}>
-              {imageIconView}
-              <Text
-                style={[imageCountStyle, styles.imageCount]}
-              >
-                {files.length}
-              </Text>
-            </View>
-          </View>
-        }
-      </View>
-    );
-  }
-}
-
-const styles = StyleSheet.create({
-  cardMedia: {
-    position: 'relative',
-  },
-  cardMediaImages: {
-    position: 'absolute',
-    left: -16,
-    right: -16,
-  },
-  overlay: {
-    position: 'absolute',
-    left: -16,
-    right: -16,
-    bottom: 0,
-    paddingTop: 24,
-    paddingBottom: 16,
-    paddingLeft: 16,
-    paddingRight: 16,
-    backgroundColor: 'rgba(0,0,0,.35)',
-  },
-  ovaerlayMoreImages: {
-    flex: 1,
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,.35)',
-  },
-  imageCount: {
-    top: 4,
-  },
-  imageIcon: {
-    top: 6,
-  },
-});
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>TeamHub</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>2.2.0</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>Facebook</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>fb1532385157028834</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>65</string>
+	<key>Fabric</key>
+	<dict>
+		<key>APIKey</key>
+		<string>68fc2e376e2550e8a960552517fdced9abeac20f</string>
+		<key>Kits</key>
+		<array>
+			<dict>
+				<key>KitInfo</key>
+				<dict/>
+				<key>KitName</key>
+				<string>Crashlytics</string>
+			</dict>
+			<dict>
+				<key>KitInfo</key>
+				<dict>
+					<key>consumerKey</key>
+					<string>79c3hLEyYbrmib2JlLxNpGOKk</string>
+					<key>consumerSecret</key>
+					<string>EiZAqimdvi5BhP6JJwFDwZzbKr9HmOcZh0sNe1ZSwJUWJNT6wf</string>
+				</dict>
+				<key>KitName</key>
+				<string>Twitter</string>
+			</dict>
+		</array>
+	</dict>
+	<key>FacebookAppID</key>
+	<string>1532385157028834</string>
+	<key>FacebookDisplayName</key>
+	<string>TeamHub</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>fbapi</string>
+		<string>fb-messenger-api</string>
+		<string>fbauth2</string>
+		<string>fbshareextension</string>
+		<string>line</string>
+	</array>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>カメラで撮影した画像を選択できるようになります</string>
+	<key>NSContactsUsageDescription</key>
+	<string>This app requires contacts access to function properly.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string></string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>アルバムから画像を選択できるようになります</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Entypo.ttf</string>
+		<string>EvilIcons.ttf</string>
+		<string>FontAwesome.ttf</string>
+		<string>Foundation.ttf</string>
+		<string>Ionicons.ttf</string>
+		<string>MaterialCommunityIcons.ttf</string>
+		<string>MaterialIcons.ttf</string>
+		<string>Octicons.ttf</string>
+		<string>SimpleLineIcons.ttf</string>
+		<string>Zocial.ttf</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>armv7</string>
+	</array>
+	<key>UIStatusBarStyle</key>
+	<string>UIStatusBarStyleLightContent</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+</dict>
+</plist>

@@ -9,6 +9,14 @@
   margin-top: 4 * @component-padding;
 }
 
+.nuclide-ui-file-changes-additions-deletion-count {
+  margin-bottom: 0.5em;
+}
+
+.nuclide-ui-hunk-diff-spacer {
+  height: 1em;
+}
+
 /* BEGIN Keep in sync with nuclide-diff-view/styles: */
 // Default colors for themes that do not specify any.
 @add-color: #0c0;
@@ -35,10 +43,6 @@ atom-text-editor {
     border-left-color: @remove-color;
     border-left-width: 1px;
     background-color: @remove-color-faded;
-  }
-
-  .nuclide-ui-checkbox-margin {
-    margin-right: 8px;
   }
 }
 /* END Keep in sync with nuclide-diff-view/styles: */

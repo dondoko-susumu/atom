@@ -225,7 +225,7 @@ class Table extends _react.default.Component {
       const optionalHeaderCellProps = {};
       if (width != null) {
         optionalHeaderCellProps.style = {
-          width: width + '%'
+          width: width * 100 + '%'
         };
       }
       let sortIndicator;
@@ -236,14 +236,13 @@ class Table extends _react.default.Component {
         if (sortedColumn === key) {
           sortIndicator = _react.default.createElement(
             'span',
-            null,
-            ' ',
+            { className: 'nuclide-ui-table-sort-indicator' },
             _react.default.createElement((_Icon || _load_Icon()).Icon, { icon: sortDescending ? 'triangle-down' : 'triangle-up' })
           );
         }
       }
       return _react.default.createElement(
-        'th',
+        'div',
         Object.assign({
           className: (0, (_classnames || _load_classnames()).default)({
             'nuclide-ui-table-header-cell': true,
@@ -274,18 +273,17 @@ class Table extends _react.default.Component {
           datum = this._renderEmptyCellContent();
         }
         const cellStyle = {};
-        if (i === 0) {
-          const width = this.state.columnWidthRatios[key];
-          if (width != null) {
-            cellStyle.width = width + '%';
-          }
+        const width = this.state.columnWidthRatios[key];
+        if (width != null) {
+          cellStyle.width = width * 100 + '%';
         }
         return _react.default.createElement(
-          'td',
+          'div',
           {
             className: 'nuclide-ui-table-body-cell',
             key: j,
-            style: cellStyle },
+            style: cellStyle,
+            title: datum != null ? String(datum) : null },
           datum
         );
       });
@@ -295,9 +293,10 @@ class Table extends _react.default.Component {
       }
       const isSelectedRow = selectedIndex != null && i === selectedIndex;
       return _react.default.createElement(
-        'tr',
+        'div',
         Object.assign({
           className: (0, (_classnames || _load_classnames()).default)(rowClassName, {
+            'nuclide-ui-table-row': true,
             'nuclide-ui-table-row-selectable': selectable,
             'nuclide-ui-table-row-selected': isSelectedRow,
             'nuclide-ui-table-row-alternate': alternateBackground !== false && i % 2 === 1,
@@ -310,15 +309,7 @@ class Table extends _react.default.Component {
     });
     if (rows.length === 0) {
       const EmptyComponent = this.props.emptyComponent || DefaultEmptyComponent;
-      body = _react.default.createElement(
-        'tr',
-        null,
-        _react.default.createElement(
-          'td',
-          null,
-          _react.default.createElement(EmptyComponent, null)
-        )
-      );
+      body = _react.default.createElement(EmptyComponent, null);
     }
     const scrollableBodyStyle = {};
     if (maxBodyHeight != null) {
@@ -329,33 +320,25 @@ class Table extends _react.default.Component {
       'div',
       { className: className },
       _react.default.createElement(
-        'table',
+        'div',
         {
           className: 'nuclide-ui-table',
           ref: 'table' },
         _react.default.createElement(
-          'thead',
+          'div',
           { className: 'nuclide-ui-table-header' },
-          _react.default.createElement(
-            'tr',
-            null,
-            header
-          )
+          header
         )
       ),
       _react.default.createElement(
         'div',
         { style: scrollableBodyStyle },
         _react.default.createElement(
-          'table',
+          'div',
           {
             className: 'nuclide-ui-table nuclide-ui-table-body native-key-bindings',
             tabIndex: '-1' },
-          _react.default.createElement(
-            'tbody',
-            null,
-            body
-          )
+          body
         )
       )
     );

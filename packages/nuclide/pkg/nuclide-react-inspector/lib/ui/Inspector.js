@@ -28,8 +28,9 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 const WORKSPACE_VIEW_URI = exports.WORKSPACE_VIEW_URI = 'atom://nuclide/react-inspector';
 
 class Inspector extends _react.default.Component {
-  constructor() {
-    super();
+
+  constructor(props) {
+    super(props);
     this._handleDidFinishLoad = this._handleDidFinishLoad.bind(this);
   }
 
@@ -38,7 +39,7 @@ class Inspector extends _react.default.Component {
   }
 
   getDefaultLocation() {
-    return 'pane';
+    return 'center';
   }
 
   getURI() {

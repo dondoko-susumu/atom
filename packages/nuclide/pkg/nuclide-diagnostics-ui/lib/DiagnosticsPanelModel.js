@@ -101,7 +101,7 @@ class DiagnosticsPanelModel {
   }
 
   getDefaultLocation() {
-    return 'bottom-panel';
+    return 'bottom';
   }
 
   serialize() {

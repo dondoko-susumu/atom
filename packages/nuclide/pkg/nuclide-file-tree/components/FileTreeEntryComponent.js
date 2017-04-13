@@ -245,7 +245,7 @@ class FileTreeEntryComponent extends _react.default.Component {
         _react.default.createElement(
           'span',
           {
-            className: `icon name ${iconName}`,
+            className: `nuclide-file-tree-path icon name ${iconName}`,
             ref: elem => {
               this._pathContainer = elem;
               tooltip && tooltip(elem);
@@ -256,6 +256,7 @@ class FileTreeEntryComponent extends _react.default.Component {
           _react.default.createElement(
             'span',
             {
+              className: 'nuclide-file-tree-path',
               'data-name': node.name,
               'data-path': node.uri },
             (0, (_FileTreeFilterHelper || _load_FileTreeFilterHelper()).filterName)(node.name, node.highlightedText, node.isSelected)

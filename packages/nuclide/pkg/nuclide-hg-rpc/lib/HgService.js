@@ -234,6 +234,30 @@ class HgService {
     }).publish();
   }
 
+  /**
+   * Like fetchStatuses, but first calculates the root of the current
+   * stack and fetches changes since that revision.
+   */
+  fetchStackStatuses() {
+    // Note: an alternative which doesn't depend upon reading .arcconfig in getForkBaseName is:
+    //   return this.fetchStatuses('ancestor(ancestor((not public()) and (:: .))^ or .)')
+    // Both the code below and the alternative above have identical performance.
+
+    return _rxjsBundlesRxMinJs.Observable.fromPromise(getForkBaseName(this._workingDirectory)) // e.g. "master"
+    .switchMap(forkBaseName => {
+      const root = (0, (_hgRevisionExpressionHelpers || _load_hgRevisionExpressionHelpers()).expressionForCommonAncestor)(forkBaseName); // e.g. "ancestor(master, .)"
+      return this.fetchStatuses(root).refCount();
+    }).publish();
+  }
+
+  /**
+   * Like fetchStatuses, but first checks whether the head is public. If so, returns
+   * changes *since* the head. If not, returns changes *including* the head.
+   */
+  fetchHeadStatuses() {
+    return this.fetchStatuses('ancestor(. or (. and (not public()))^)');
+  }
+
   _subscribeToWatchman() {
     var _this2 = this;
 
@@ -246,7 +270,6 @@ class HgService {
       let primarySubscriptionExpression = ['allof', ['not', ['dirname', '.hg']],
       // Hg appears to modify temporary files that begin with these
       // prefixes, every time a file is saved.
-      // TODO (t7832809) Remove this when it is unnecessary.
       ['not', ['match', 'hg-checkexec-*', 'wholename']], ['not', ['match', 'hg-checklink-*', 'wholename']],
       // This watchman subscription is used to determine when and which
       // files to fetch new statuses for. There is no reason to include
@@ -686,19 +709,13 @@ class HgService {
   }
 
   _commitCode(message, args, isInteractive) {
-    if (isInteractive) {
-      args.push('--interactive');
-    } else {
-      // Currently if amend leads to a  merge conflict that requires user input
-      // nuclide just freezes doing nothing. This flag will prevent that behavior
-      // and will break out leaving the files unresolved.
-      args.push('--noninteractive');
-    }
-    let tempFile = null;
     let editMergeConfigs;
-
+    let tempFile = null;
     return _rxjsBundlesRxMinJs.Observable.fromPromise((0, _asyncToGenerator.default)(function* () {
-      editMergeConfigs = yield (0, (_hgUtils || _load_hgUtils()).getEditMergeConfigs)();
+      if (isInteractive) {
+        args.push('--interactive');
+        editMergeConfigs = yield (0, (_hgUtils || _load_hgUtils()).getInteractiveCommitEditorConfig)();
+      }
       if (message == null) {
         return args;
       } else {
@@ -706,15 +723,15 @@ class HgService {
         return [...args, '-l', tempFile];
       }
     })()).switchMap(argumentsWithCommitFile => {
-      if (!(editMergeConfigs != null)) {
-        throw new Error('editMergeConfigs cannot be null');
-      }
-
+      const execArgs = argumentsWithCommitFile;
       const execOptions = {
-        cwd: this._workingDirectory,
-        HGEDITOR: editMergeConfigs.hgEditor
+        cwd: this._workingDirectory
       };
-      return this._hgObserveExecution([...editMergeConfigs.args, ...argumentsWithCommitFile], execOptions);
+      if (editMergeConfigs != null) {
+        execArgs.push(...editMergeConfigs.args);
+        execOptions.HGEDITOR = editMergeConfigs.hgEditor;
+      }
+      return this._hgObserveExecution(execArgs, execOptions);
     }).finally(() => {
       if (tempFile != null) {
         (_fsPromise || _load_fsPromise()).default.unlink(tempFile);
@@ -758,7 +775,7 @@ class HgService {
   splitRevision() {
     let editMergeConfigs;
     return _rxjsBundlesRxMinJs.Observable.fromPromise((0, _asyncToGenerator.default)(function* () {
-      editMergeConfigs = yield (0, (_hgUtils || _load_hgUtils()).getEditMergeConfigs)();
+      editMergeConfigs = yield (0, (_hgUtils || _load_hgUtils()).getInteractiveCommitEditorConfig)();
     })()).switchMap(() => {
       if (!(editMergeConfigs != null)) {
         throw new Error('editMergeConfigs cannot be null');
@@ -804,11 +821,14 @@ class HgService {
    * @param options.
    */
   checkout(revision, create, options) {
-    const args = [revision];
+    const args = ['checkout', revision];
     if (options && options.clean) {
       args.push('--clean');
     }
-    return this._runSimpleInWorkingDirectory('checkout', args);
+    const executionOptions = {
+      cwd: this._workingDirectory
+    };
+    return (0, (_hgUtils || _load_hgUtils()).hgObserveExecution)(args, executionOptions).timeout(300000).switchMap((_hgUtils || _load_hgUtils()).processExitCodeAndThrow).publish();
   }
 
   show(revision) {
@@ -933,8 +953,7 @@ class HgService {
     var _this17 = this;
 
     return (0, _asyncToGenerator.default)(function* () {
-      // Once TODO(t14843143) is done the extension would be enabled by default
-      const args = ['--config', 'extensions.debugcommitmessage= ', 'debugcommitmessage'];
+      const args = ['debugcommitmessage'];
       const execOptions = {
         cwd: _this17._workingDirectory
       };

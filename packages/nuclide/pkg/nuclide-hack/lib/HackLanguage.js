@@ -7,23 +7,40 @@ exports.isFileInHackProject = exports.getHackLanguageForUri = exports.hackLangua
 
 var _asyncToGenerator = _interopRequireDefault(require('async-to-generator'));
 
-let connectionToHackService = (() => {
-  var _ref = (0, _asyncToGenerator.default)(function* (connection) {
-    const hackService = (0, (_nuclideRemoteConnection || _load_nuclideRemoteConnection()).getServiceByConnection)(HACK_SERVICE_NAME, connection);
-    const config = (0, (_config || _load_config()).getConfig)();
-    const fileNotifier = yield (0, (_nuclideOpenFiles || _load_nuclideOpenFiles()).getNotifierByConnection)(connection);
-    const languageService = yield hackService.initialize(config.hhClientPath, config.logLevel, fileNotifier);
-
-    return languageService;
+let getUseLspConnection = (() => {
+  var _ref = (0, _asyncToGenerator.default)(function* () {
+    return (0, (_passesGK || _load_passesGK()).default)('nuclide_hack_use_lsp_connection');
   });
 
-  return function connectionToHackService(_x) {
+  return function getUseLspConnection() {
     return _ref.apply(this, arguments);
   };
 })();
 
+let connectionToHackService = (() => {
+  var _ref2 = (0, _asyncToGenerator.default)(function* (connection) {
+    const hackService = (0, (_nuclideRemoteConnection || _load_nuclideRemoteConnection()).getServiceByConnection)(HACK_SERVICE_NAME, connection);
+    const config = (0, (_config || _load_config()).getConfig)();
+    const fileNotifier = yield (0, (_nuclideOpenFiles || _load_nuclideOpenFiles()).getNotifierByConnection)(connection);
+
+    if (yield getUseLspConnection()) {
+      return hackService.initializeLsp(config.hhClientPath, // command
+      ['lsp'], // arguments
+      '.hhconfig', // project file
+      ['.php'], // which file-notifications should be sent to LSP
+      config.logLevel, fileNotifier);
+    } else {
+      return hackService.initialize(config.hhClientPath, config.logLevel, fileNotifier);
+    }
+  });
+
+  return function connectionToHackService(_x) {
+    return _ref2.apply(this, arguments);
+  };
+})();
+
 let createLanguageService = (() => {
-  var _ref2 = (0, _asyncToGenerator.default)(function* () {
+  var _ref3 = (0, _asyncToGenerator.default)(function* () {
     const atomConfig = {
       name: 'Hack',
       grammars: (_nuclideHackCommon || _load_nuclideHackCommon()).HACK_GRAMMARS,
@@ -65,7 +82,8 @@ let createLanguageService = (() => {
       },
       evaluationExpression: {
         version: '0.0.0',
-        analyticsEventName: 'hack.evaluationExpression'
+        analyticsEventName: 'hack.evaluationExpression',
+        regexp: (_nuclideHackCommon || _load_nuclideHackCommon()).HACK_WORD_REGEX
       },
       autocomplete: {
         version: '2.0.0',
@@ -91,7 +109,7 @@ let createLanguageService = (() => {
   });
 
   return function createLanguageService() {
-    return _ref2.apply(this, arguments);
+    return _ref3.apply(this, arguments);
   };
 })();
 
@@ -99,24 +117,24 @@ let createLanguageService = (() => {
 
 
 let getHackLanguageForUri = exports.getHackLanguageForUri = (() => {
-  var _ref3 = (0, _asyncToGenerator.default)(function* (uri) {
+  var _ref4 = (0, _asyncToGenerator.default)(function* (uri) {
     return (yield hackLanguageService).getLanguageServiceForUri(uri);
   });
 
   return function getHackLanguageForUri(_x2) {
-    return _ref3.apply(this, arguments);
+    return _ref4.apply(this, arguments);
   };
 })();
 
 let isFileInHackProject = exports.isFileInHackProject = (() => {
-  var _ref4 = (0, _asyncToGenerator.default)(function* (fileUri) {
+  var _ref5 = (0, _asyncToGenerator.default)(function* (fileUri) {
     const fileSystemService = (0, (_nuclideRemoteConnection || _load_nuclideRemoteConnection()).getFileSystemServiceByNuclideUri)(fileUri);
     const foundDir = yield fileSystemService.findNearestFile('.hhconfig', (_nuclideUri || _load_nuclideUri()).default.getPath(fileUri));
     return foundDir != null;
   });
 
   return function isFileInHackProject(_x3) {
-    return _ref4.apply(this, arguments);
+    return _ref5.apply(this, arguments);
   };
 })();
 
@@ -164,19 +182,23 @@ function _load_nuclideUri() {
   return _nuclideUri = _interopRequireDefault(require('../../commons-node/nuclideUri'));
 }
 
+var _passesGK;
+
+function _load_passesGK() {
+  return _passesGK = _interopRequireDefault(require('../../commons-node/passesGK'));
+}
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-/**
- * Copyright (c) 2015-present, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the license found in the LICENSE file in
- * the root directory of this source tree.
- *
- * 
- */
-
-const HACK_SERVICE_NAME = 'HackService';
+const HACK_SERVICE_NAME = 'HackService'; /**
+                                          * Copyright (c) 2015-present, Facebook, Inc.
+                                          * All rights reserved.
+                                          *
+                                          * This source code is licensed under the license found in the LICENSE file in
+                                          * the root directory of this source tree.
+                                          *
+                                          * 
+                                          */
 
 let hackLanguageService = exports.hackLanguageService = createLanguageService();
 
@@ -188,12 +210,12 @@ function resetHackLanguageService() {
 }
 
 function updateAutocompleteResults(request, firstResult) {
-  if (firstResult == null) {
+  if (firstResult.isIncomplete) {
     return null;
   }
   const replacementPrefix = (0, (_autocomplete || _load_autocomplete()).findHackPrefix)(request.editor.getBuffer(), request.bufferPosition);
-  const updatedCompletions = updateReplacementPrefix(request, firstResult, replacementPrefix);
-  return (0, (_autocomplete || _load_autocomplete()).sortAndFilterCompletions)(updatedCompletions, replacementPrefix);
+  const updatedCompletions = updateReplacementPrefix(request, firstResult.items, replacementPrefix);
+  return Object.assign({}, firstResult, { items: (0, (_autocomplete || _load_autocomplete()).sortAndFilterCompletions)(updatedCompletions, replacementPrefix) });
 }
 
 function updateReplacementPrefix(request, firstResult, prefixCandidate) {

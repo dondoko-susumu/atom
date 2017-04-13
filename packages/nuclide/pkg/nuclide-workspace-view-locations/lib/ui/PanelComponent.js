@@ -324,7 +324,7 @@ class PanelComponent extends _react.default.Component {
       // The item may not have been activated yet. If that's the case, just use the first item.
       const activePaneItem = this.props.paneContainer.getActivePaneItem() || this.props.paneContainer.getPaneItems()[0];
       if (activePaneItem != null) {
-        initialSize = getPreferredInitialSize(activePaneItem, this.props.position);
+        initialSize = getPreferredSize(activePaneItem, this.props.position);
       }
     }
     return initialSize == null ? DEFAULT_INITIAL_SIZE : initialSize;
@@ -335,14 +335,14 @@ exports.PanelComponent = PanelComponent;
 PanelComponent.defaultProps = {
   onResize: width => {}
 };
-function getPreferredInitialSize(item, position) {
+function getPreferredSize(item, position) {
   switch (position) {
     case 'top':
     case 'bottom':
-      return typeof item.getPreferredInitialHeight === 'function' ? item.getPreferredInitialHeight() : null;
+      return typeof item.getPreferredHeight === 'function' ? item.getPreferredHeight() : null;
     case 'left':
     case 'right':
-      return typeof item.getPreferredInitialWidth === 'function' ? item.getPreferredInitialWidth() : null;
+      return typeof item.getPreferredWidth === 'function' ? item.getPreferredWidth() : null;
     default:
       throw new Error(`Invalid position: ${position}`);
   }

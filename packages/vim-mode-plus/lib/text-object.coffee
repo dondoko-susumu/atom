@@ -23,6 +23,7 @@ swrap = require './selection-wrapper'
 
 class TextObject extends Base
   @extend(false)
+  @operationKind: 'text-object'
   wise: 'characterwise'
   supportCount: false # FIXME #472, #66
   selectOnce: false
@@ -427,6 +428,16 @@ class Comment extends TextObject
     if rowRange?
       @getBufferRangeForRowRange(rowRange)
 
+class CommentOrParagraph extends TextObject
+  @extend(false)
+  @deriveInnerAndA()
+  wise: 'linewise'
+
+  getRange: (selection) ->
+    for klass in ['Comment', 'Paragraph']
+      if range = @new(klass, {@inner}).getRange(selection)
+        return range
+
 # Section: Fold
 # =========================
 class Fold extends TextObject
@@ -508,7 +519,10 @@ class LatestChange extends TextObject
   wise: null
   selectOnce: true
   getRange: (selection) ->
-    @vimState.mark.getRange('[', ']')
+    start = @vimState.mark.get('[')
+    end = @vimState.mark.get(']')
+    if start? and end?
+      new Range(start, end)
 
 class SearchMatchForward extends TextObject
   @extend()
@@ -577,8 +591,7 @@ class PreviousSelection extends TextObject
     {properties, submode} = @vimState.previousSelection
     if properties? and submode?
       @wise = submode
-      selection = @editor.getLastSelection()
-      swrap(selection).selectByProperties(properties, keepGoalColumn: false)
+      swrap(@editor.getLastSelection()).selectByProperties(properties)
       return true
 
 class PersistentSelection extends TextObject

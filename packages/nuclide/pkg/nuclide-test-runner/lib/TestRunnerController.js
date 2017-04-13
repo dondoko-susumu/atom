@@ -75,13 +75,11 @@ class TestRunnerController {
 
   constructor(testRunners) {
     this._root = document.createElement('div');
-
-    this._panelVisible = false;
+    this._root.style.display = 'flex';
 
     // Bind Functions for use as callbacks;
     // TODO: Replace with property initializers when supported by Flow;
     this.clearOutput = this.clearOutput.bind(this);
-    this.hidePanel = this.hidePanel.bind(this);
     this.stopTests = this.stopTests.bind(this);
     this._handleClickRun = this._handleClickRun.bind(this);
     this._onDebuggerCheckboxChanged = this._onDebuggerCheckboxChanged.bind(this);
@@ -116,12 +114,6 @@ class TestRunnerController {
     this._renderPanel();
   }
 
-  hidePanel() {
-    (0, (_nuclideAnalytics || _load_nuclideAnalytics()).track)('testrunner-hide-panel');
-    this.stopTests();
-    this._panelVisible = false;
-  }
-
   /**
    * @return A Promise that resolves when testing has succesfully started.
    */
@@ -130,18 +122,7 @@ class TestRunnerController {
 
     return (0, _asyncToGenerator.default)(function* () {
       _this._runningTest = true;
-
-      // If the test runner panel is not rendered yet, ensure it is rendered before continuing.
-      if (_this._testRunnerPanel == null || !_this._panelVisible) {
-        yield new Promise(function (resolve, reject) {
-          _this.showPanel(resolve);
-        });
-      }
-
-      if (_this._testRunnerPanel == null) {
-        logger.error('Test runner panel did not render as expected. Aborting testing.');
-        return;
-      }
+      atom.commands.dispatch(atom.views.getView(atom.workspace), 'nuclide-test-runner:toggle-panel', { visible: true });
 
       // Get selected test runner when Flow knows `this._testRunnerPanel` is defined.
       const selectedTestRunner = _this._testRunnerPanel.getSelectedTestRunner();
@@ -221,24 +202,6 @@ class TestRunnerController {
     this._stopListening();
     // Respond in the UI immediately and assume the process is properly killed.
     this._setExecutionState((_TestRunnerPanel || _load_TestRunnerPanel()).default.ExecutionState.STOPPED);
-  }
-
-  showPanel(didRender) {
-    (0, (_nuclideAnalytics || _load_nuclideAnalytics()).track)('testrunner-show-panel');
-    this._panelVisible = true;
-    this._renderPanel(didRender);
-  }
-
-  togglePanel() {
-    if (this._panelVisible) {
-      this.hidePanel();
-    } else {
-      this.showPanel();
-    }
-  }
-
-  isVisible() {
-    return this._panelVisible;
   }
 
   /**
@@ -325,13 +288,7 @@ class TestRunnerController {
     this._renderPanel();
   }
 
-  _renderPanel(didRender) {
-    // Initialize and render the contents of the panel only if the hosting container is visible by
-    // the user's choice.
-    if (!this._panelVisible) {
-      return;
-    }
-
+  _renderPanel() {
     let progressValue;
     if (this._testSuiteModel && this._executionState === (_TestRunnerPanel || _load_TestRunnerPanel()).default.ExecutionState.RUNNING) {
       progressValue = this._testSuiteModel.progressPercent();
@@ -340,13 +297,11 @@ class TestRunnerController {
       // track.
       progressValue = 100;
     }
-    this._root.style.display = 'flex';
     const component = _reactDom.default.render(_react.default.createElement((_TestRunnerPanel || _load_TestRunnerPanel()).default, {
       attachDebuggerBeforeRunning: this._attachDebuggerBeforeRunning,
       buffer: this._buffer,
       executionState: this._executionState,
       onClickClear: this.clearOutput,
-      onClickClose: this.hidePanel,
       onClickRun: this._handleClickRun,
       onClickStop: this.stopTests,
       onDebuggerCheckboxChanged: this._onDebuggerCheckboxChanged,
@@ -358,7 +313,7 @@ class TestRunnerController {
       // determinate on each render.
       , testRunners: Array.from(this._testRunners),
       testSuiteModel: this._testSuiteModel
-    }), this._root, didRender);
+    }), this._root);
 
     if (!(component instanceof (_TestRunnerPanel || _load_TestRunnerPanel()).default)) {
       throw new Error('Invariant violation: "component instanceof TestRunnerPanel"');
@@ -410,15 +365,7 @@ class TestRunnerController {
   }
 
   getDefaultLocation() {
-    return 'bottom-panel';
-  }
-
-  didChangeVisibility(visible) {
-    if (visible) {
-      this.showPanel();
-    } else {
-      this.hidePanel();
-    }
+    return 'bottom';
   }
 
   getElement() {

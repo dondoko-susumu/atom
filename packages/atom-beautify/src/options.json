@@ -1551,9 +1551,11 @@
         "default": "auto",
         "enum": [
           "auto",
-          "force"
+          "force",
+          "force-aligned",
+          "force-expand-multiline"
         ],
-        "description": "Wrap attributes to new lines [auto|force] (Supported by JS Beautify)",
+        "description": "Wrap attributes to new lines [auto|force|force-aligned|force-expand-multiline] (Supported by JS Beautify)",
         "title": "Wrap attributes",
         "beautifiers": [
           "JS Beautify"
@@ -2261,9 +2263,11 @@
         "default": "auto",
         "enum": [
           "auto",
-          "force"
+          "force",
+          "force-aligned",
+          "force-expand-multiline"
         ],
-        "description": "Wrap attributes to new lines [auto|force] (Supported by JS Beautify)",
+        "description": "Wrap attributes to new lines [auto|force|force-aligned|force-expand-multiline] (Supported by JS Beautify)",
         "title": "Wrap attributes",
         "beautifiers": [
           "JS Beautify"
@@ -2627,9 +2631,11 @@
         "default": "auto",
         "enum": [
           "auto",
-          "force"
+          "force",
+          "force-aligned",
+          "force-expand-multiline"
         ],
-        "description": "Wrap attributes to new lines [auto|force] (Supported by JS Beautify)",
+        "description": "Wrap attributes to new lines [auto|force|force-aligned|force-expand-multiline] (Supported by JS Beautify)",
         "title": "Wrap attributes",
         "beautifiers": [
           "JS Beautify"
@@ -2967,6 +2973,7 @@
     "beautifiers": [
       "JS Beautify",
       "JSCS Fixer",
+      "ESLint Fixer",
       "Pretty Diff"
     ],
     "grammars": [
@@ -3275,6 +3282,7 @@
         "enum": [
           "JS Beautify",
           "JSCS Fixer",
+          "ESLint Fixer",
           "Pretty Diff"
         ]
       },
@@ -3633,6 +3641,20 @@
       "js"
     ],
     "properties": {
+      "e4x": {
+        "type": "boolean",
+        "default": true,
+        "description": "Support e4x/jsx syntax (Supported by JS Beautify)",
+        "title": "E4x",
+        "beautifiers": [
+          "JS Beautify"
+        ],
+        "key": "e4x",
+        "language": {
+          "name": "JSX",
+          "namespace": "jsx"
+        }
+      },
       "indent_size": {
         "type": "integer",
         "default": 4,
@@ -4572,9 +4594,11 @@
         "default": "auto",
         "enum": [
           "auto",
-          "force"
+          "force",
+          "force-aligned",
+          "force-expand-multiline"
         ],
-        "description": "Wrap attributes to new lines [auto|force] (Supported by Marko Beautifier)",
+        "description": "Wrap attributes to new lines [auto|force|force-aligned|force-expand-multiline] (Supported by Marko Beautifier)",
         "title": "Wrap attributes",
         "beautifiers": [
           "Marko Beautifier"
@@ -4891,9 +4915,11 @@
         "default": "auto",
         "enum": [
           "auto",
-          "force"
+          "force",
+          "force-aligned",
+          "force-expand-multiline"
         ],
-        "description": "Wrap attributes to new lines [auto|force] (Supported by JS Beautify)",
+        "description": "Wrap attributes to new lines [auto|force|force-aligned|force-expand-multiline] (Supported by JS Beautify)",
         "title": "Wrap attributes",
         "beautifiers": [
           "JS Beautify"
@@ -7778,9 +7804,11 @@
         "default": "auto",
         "enum": [
           "auto",
-          "force"
+          "force",
+          "force-aligned",
+          "force-expand-multiline"
         ],
-        "description": "Wrap attributes to new lines [auto|force] (Supported by Vue Beautifier)",
+        "description": "Wrap attributes to new lines [auto|force|force-aligned|force-expand-multiline] (Supported by Vue Beautifier)",
         "title": "Wrap attributes",
         "beautifiers": [
           "Vue Beautifier"
@@ -8171,9 +8199,11 @@
         "default": "auto",
         "enum": [
           "auto",
-          "force"
+          "force",
+          "force-aligned",
+          "force-expand-multiline"
         ],
-        "description": "Wrap attributes to new lines [auto|force] (Supported by JS Beautify)",
+        "description": "Wrap attributes to new lines [auto|force|force-aligned|force-expand-multiline] (Supported by JS Beautify)",
         "title": "Wrap attributes",
         "beautifiers": [
           "JS Beautify"

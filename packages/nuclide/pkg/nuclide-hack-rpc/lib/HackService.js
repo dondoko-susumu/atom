@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.initialize = undefined;
+exports.initialize = exports.initializeLsp = undefined;
 
 var _asyncToGenerator = _interopRequireDefault(require('async-to-generator'));
 
@@ -17,16 +17,32 @@ var _asyncToGenerator = _interopRequireDefault(require('async-to-generator'));
  * 
  */
 
+let initializeLsp = exports.initializeLsp = (() => {
+  var _ref = (0, _asyncToGenerator.default)(function* (command, args, projectFileName, fileExtensions, logLevel, fileNotifier) {
+    if (!(fileNotifier instanceof (_nuclideOpenFilesRpc || _load_nuclideOpenFilesRpc()).FileCache)) {
+      throw new Error('Invariant violation: "fileNotifier instanceof FileCache"');
+    }
+
+    (_hackConfig || _load_hackConfig()).logger.setLogLevel(logLevel);
+    const cmd = command === '' ? yield (0, (_hackConfig || _load_hackConfig()).getHackCommand)() : command;
+    return new (_nuclideVscodeLanguageService || _load_nuclideVscodeLanguageService()).PerConnectionLanguageService((_hackConfig || _load_hackConfig()).logger, fileNotifier, cmd, args, projectFileName, fileExtensions);
+  });
+
+  return function initializeLsp(_x, _x2, _x3, _x4, _x5, _x6) {
+    return _ref.apply(this, arguments);
+  };
+})();
+
 let initialize = exports.initialize = (() => {
-  var _ref = (0, _asyncToGenerator.default)(function* (hackCommand, logLevel, fileNotifier) {
+  var _ref2 = (0, _asyncToGenerator.default)(function* (hackCommand, logLevel, fileNotifier) {
     (0, (_hackConfig || _load_hackConfig()).setHackCommand)(hackCommand);
     (_hackConfig || _load_hackConfig()).logger.setLogLevel(logLevel);
     yield (0, (_hackConfig || _load_hackConfig()).getHackCommand)();
     return new HackLanguageServiceImpl(fileNotifier);
   });
 
-  return function initialize(_x, _x2, _x3) {
-    return _ref.apply(this, arguments);
+  return function initialize(_x7, _x8, _x9) {
+    return _ref2.apply(this, arguments);
   };
 })();
 
@@ -36,6 +52,18 @@ var _range;
 
 function _load_range() {
   return _range = require('../../commons-node/range');
+}
+
+var _collection;
+
+function _load_collection() {
+  return _collection = require('../../commons-node/collection');
+}
+
+var _nuclideVscodeLanguageService;
+
+function _load_nuclideVscodeLanguageService() {
+  return _nuclideVscodeLanguageService = require('../../nuclide-vscode-language-service');
 }
 
 var _HackHelpers;
@@ -98,12 +126,6 @@ function _load_nuclideOpenFilesRpc() {
   return _nuclideOpenFilesRpc = require('../../nuclide-open-files-rpc');
 }
 
-var _EvaluationExpression;
-
-function _load_EvaluationExpression() {
-  return _EvaluationExpression = require('./EvaluationExpression');
-}
-
 var _nuclideLanguageServiceRpc;
 
 function _load_nuclideLanguageServiceRpc() {
@@ -156,10 +178,29 @@ class HackLanguageServiceImpl extends (_nuclideLanguageServiceRpc || _load_nucli
   }
 
   /**
-   * Performs a Hack symbol search in the specified directory.
+   * Does this service want the symbol-search tab to appear in quick-open?
    */
-  executeQuery(rootDirectory, queryString) {
-    return (0, (_SymbolSearch || _load_SymbolSearch()).executeQuery)(rootDirectory, queryString);
+  supportsSymbolSearch(directories) {
+    return (0, _asyncToGenerator.default)(function* () {
+      const promises = directories.map(function (directory) {
+        return (0, (_hackConfig || _load_hackConfig()).findHackConfigDir)(directory);
+      });
+      const hackRoots = yield Promise.all(promises);
+      return (0, (_collection || _load_collection()).arrayCompact)(hackRoots).length > 0;
+    })();
+  }
+
+  /**
+   * Performs a Hack symbol search over all hack projects we manage
+   */
+  symbolSearch(queryString, directories) {
+    return (0, _asyncToGenerator.default)(function* () {
+      const promises = directories.map(function (directory) {
+        return (0, (_SymbolSearch || _load_SymbolSearch()).executeQuery)(directory, queryString);
+      });
+      const results = yield Promise.all(promises);
+      return (0, (_collection || _load_collection()).arrayFlatten)(results);
+    })();
   }
 
   dispose() {
@@ -381,7 +422,10 @@ class HackSingleFileLanguageService {
       } else if (response.error_message !== '') {
         throw new Error(`Error formatting hack source: ${response.error_message}`);
       }
-      return response.result;
+      return [{
+        oldRange: range,
+        newText: response.result
+      }];
     })();
   }
 
@@ -391,7 +435,7 @@ class HackSingleFileLanguageService {
 
   getEvaluationExpression(filePath, buffer, position) {
     return (0, _asyncToGenerator.default)(function* () {
-      return (0, (_EvaluationExpression || _load_EvaluationExpression()).getEvaluationExpression)(filePath, buffer, position);
+      throw new Error('Not implemented');
     })();
   }
 

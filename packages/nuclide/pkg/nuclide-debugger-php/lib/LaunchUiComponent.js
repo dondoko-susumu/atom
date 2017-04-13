@@ -57,6 +57,18 @@ function _load_consumeFirstProvider() {
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+const MAX_RECENTLY_LAUNCHED = 5; /**
+                                  * Copyright (c) 2015-present, Facebook, Inc.
+                                  * All rights reserved.
+                                  *
+                                  * This source code is licensed under the license found in the LICENSE file in
+                                  * the root directory of this source tree.
+                                  *
+                                  * 
+                                  */
+
+/* global localStorage */
+
 class LaunchUiComponent extends _react.default.Component {
 
   constructor(props) {
@@ -65,9 +77,12 @@ class LaunchUiComponent extends _react.default.Component {
     this._handleCancelButtonClick = this._handleCancelButtonClick.bind(this);
     this._handleLaunchButtonClick = this._handleLaunchButtonClick.bind(this);
     this._handlePathsDropdownChange = this._handlePathsDropdownChange.bind(this);
+    this._handleRecentSelectionChange = this._handleRecentSelectionChange.bind(this);
     this.state = {
       pathsDropdownIndex: 0,
-      pathMenuItems: this._getPathMenuItems()
+      pathMenuItems: this._getPathMenuItems(),
+      recentlyLaunchedScripts: this._getRecentlyLaunchedScripts(),
+      recentlyLaunchedScript: null
     };
   }
 
@@ -101,13 +116,26 @@ class LaunchUiComponent extends _react.default.Component {
       _react.default.createElement(
         'label',
         null,
+        'Recently launched commands: '
+      ),
+      _react.default.createElement((_Dropdown || _load_Dropdown()).Dropdown, {
+        className: 'inline-block nuclide-debugger-recently-launched',
+        options: [{ label: '', value: null }, ...this.state.recentlyLaunchedScripts],
+        onChange: this._handleRecentSelectionChange,
+        value: this.state.recentlyLaunchedScript
+      }),
+      _react.default.createElement(
+        'label',
+        null,
         'Command: '
       ),
       _react.default.createElement((_AtomInput || _load_AtomInput()).AtomInput, {
         ref: 'scriptPath',
         tabIndex: '11',
         placeholderText: '/path/to/my/script.php arg1 arg2',
-        initialValue: this._getActiveFilePath()
+        initialValue: this._getActiveFilePath(),
+        value: this.state.recentlyLaunchedScript || '',
+        sugges: true
       }),
       _react.default.createElement(
         'div',
@@ -126,6 +154,43 @@ class LaunchUiComponent extends _react.default.Component {
         )
       )
     );
+  }
+
+  _getRecentlyLaunchedKey() {
+    const hostname = (_nuclideUri || _load_nuclideUri()).default.getHostname(this.props.targetUri);
+    return 'nuclide-debugger-php.recentlyLaunchedScripts:' + hostname;
+  }
+
+  _getRecentlyLaunchedScripts() {
+    const recentlyLaunched = localStorage.getItem(this._getRecentlyLaunchedKey());
+    if (recentlyLaunched == null) {
+      return [];
+    }
+
+    const items = JSON.parse(String(recentlyLaunched));
+    return items.filter(script => script !== '').map(script => {
+      return {
+        label: script,
+        value: script
+      };
+    });
+  }
+
+  _setRecentlyLaunchedScript(script, recentlyLaunched) {
+    // Act like a simple MRU cache, move the script being launched to the front.
+    // NOTE: this array is expected to be really tiny.
+    const scriptNames = [script];
+    recentlyLaunched.forEach(item => {
+      if (item.label !== script && scriptNames.length < MAX_RECENTLY_LAUNCHED) {
+        scriptNames.push(item.label);
+      }
+    });
+
+    localStorage.setItem(this._getRecentlyLaunchedKey(), JSON.stringify(scriptNames));
+    this.setState({
+      recentlyLaunchedScripts: this._getRecentlyLaunchedScripts(),
+      recentlyLaunchedScript: script
+    });
   }
 
   _getPathMenuItems() {
@@ -147,8 +212,16 @@ class LaunchUiComponent extends _react.default.Component {
     });
   }
 
+  _handleRecentSelectionChange(newValue) {
+    this.setState({
+      recentlyLaunchedScript: newValue
+    });
+  }
+
   _handleLaunchButtonClick() {
     const scriptPath = this.refs.scriptPath.getText().trim();
+    this._setRecentlyLaunchedScript(scriptPath, this.state.recentlyLaunchedScripts);
+
     const processInfo = new (_LaunchProcessInfo || _load_LaunchProcessInfo()).LaunchProcessInfo(this.props.targetUri, scriptPath);
     (0, (_consumeFirstProvider || _load_consumeFirstProvider()).default)('nuclide-debugger.remote').then(debuggerService => debuggerService.startDebugging(processInfo));
     this._showDebuggerPanel();
@@ -182,12 +255,4 @@ class LaunchUiComponent extends _react.default.Component {
     atom.commands.dispatch(atom.views.getView(atom.workspace), 'nuclide-debugger:toggle-launch-attach');
   }
 }
-exports.LaunchUiComponent = LaunchUiComponent; /**
-                                                * Copyright (c) 2015-present, Facebook, Inc.
-                                                * All rights reserved.
-                                                *
-                                                * This source code is licensed under the license found in the LICENSE file in
-                                                * the root directory of this source tree.
-                                                *
-                                                * 
-                                                */
+exports.LaunchUiComponent = LaunchUiComponent;

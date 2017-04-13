@@ -70,7 +70,7 @@ function renderNumber(evaluationResult) {
   return type === 'number' ? _react.default.createElement(
     'span',
     { className: (_ValueComponentClassNames || _load_ValueComponentClassNames()).ValueComponentClassNames.number },
-    value
+    String(value)
   ) : null;
 }
 

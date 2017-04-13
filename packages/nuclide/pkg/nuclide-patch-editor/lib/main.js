@@ -12,6 +12,12 @@ function _load_redux() {
   return _redux = require('redux');
 }
 
+var _bindObservableAsProps;
+
+function _load_bindObservableAsProps() {
+  return _bindObservableAsProps = require('../../nuclide-ui/bindObservableAsProps');
+}
+
 var _createEmptyAppState;
 
 function _load_createEmptyAppState() {
@@ -26,16 +32,22 @@ function _load_createPackage() {
 
 var _atom = require('atom');
 
-var _InteractiveFileChanges;
+var _PatchEditor;
 
-function _load_InteractiveFileChanges() {
-  return _InteractiveFileChanges = _interopRequireDefault(require('./ui/InteractiveFileChanges'));
+function _load_PatchEditor() {
+  return _PatchEditor = _interopRequireDefault(require('./ui/PatchEditor'));
 }
 
 var _textEditor;
 
 function _load_textEditor() {
   return _textEditor = require('../../commons-atom/text-editor');
+}
+
+var _nullthrows;
+
+function _load_nullthrows() {
+  return _nullthrows = _interopRequireDefault(require('nullthrows'));
 }
 
 var _rxjsBundlesRxMinJs = require('rxjs/bundles/Rx.min.js');
@@ -54,12 +66,10 @@ function _load_utils() {
 
 var _react = _interopRequireDefault(require('react'));
 
-var _reactDom = _interopRequireDefault(require('react-dom'));
+var _nuclideVcsBase;
 
-var _vcs;
-
-function _load_vcs() {
-  return _vcs = require('../../commons-atom/vcs');
+function _load_nuclideVcsBase() {
+  return _nuclideVcsBase = require('../../nuclide-vcs-base');
 }
 
 var _Reducers;
@@ -68,15 +78,37 @@ function _load_Reducers() {
   return _Reducers = require('./redux/Reducers');
 }
 
+var _nuclideAnalytics;
+
+function _load_nuclideAnalytics() {
+  return _nuclideAnalytics = require('../../nuclide-analytics');
+}
+
 var _UniversalDisposable;
 
 function _load_UniversalDisposable() {
   return _UniversalDisposable = _interopRequireDefault(require('../../commons-node/UniversalDisposable'));
 }
 
+var _viewableFromReactElement;
+
+function _load_viewableFromReactElement() {
+  return _viewableFromReactElement = require('../../commons-atom/viewableFromReactElement');
+}
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
+
+/**
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the license found in the LICENSE file in
+ * the root directory of this source tree.
+ *
+ * 
+ */
 
 class Activation {
 
@@ -84,16 +116,18 @@ class Activation {
     this._subscriptions = new (_UniversalDisposable || _load_UniversalDisposable()).default();
 
     const initialState = (0, (_createEmptyAppState || _load_createEmptyAppState()).createEmptyAppState)();
-    this._states = new _rxjsBundlesRxMinJs.BehaviorSubject(initialState);
 
+    this._states = new _rxjsBundlesRxMinJs.BehaviorSubject(initialState);
     this._store = (0, (_redux || _load_redux()).createStore)((_Reducers || _load_Reducers()).rootReducer, initialState);
+    const stateSubscription = _rxjsBundlesRxMinJs.Observable.from(this._store).subscribe(this._states);
+    this._subscriptions.add(stateSubscription);
 
     this._actionCreators = (0, (_redux || _load_redux()).bindActionCreators)(_Actions || _load_Actions(), this._store.dispatch);
   }
 
   consumeCwdApi(cwdApi) {
     const subscription = (0, (_event || _load_event()).observableFromSubscribeFunction)(cwdApi.observeCwd.bind(cwdApi)).switchMap(directory => {
-      const repository = directory ? (0, (_vcs || _load_vcs()).repositoryForPath)(directory.getPath()) : null;
+      const repository = directory ? (0, (_nuclideVcsBase || _load_nuclideVcsBase()).repositoryForPath)(directory.getPath()) : null;
       if (repository == null || repository.getType() !== 'hg') {
         return _rxjsBundlesRxMinJs.Observable.of(false);
       }
@@ -134,61 +168,60 @@ class Activation {
     const diffContent = editor.getText();
     const patch = (0, (_utils || _load_utils()).parseWithAnnotations)(diffContent);
     if (patch.length > 0) {
+      (0, (_nuclideAnalytics || _load_nuclideAnalytics()).track)('patch-editor-created');
       // Clear the editor so that closing the tab without hitting 'Confirm' won't
       // cause the commit to go through by default
       editor.setText('');
       editor.save();
       editor.getGutters().forEach(gutter => gutter.hide());
+      const marker = editor.markScreenPosition([0, 0]);
       const editorView = atom.views.getView(editor);
       editorView.style.visibility = 'hidden';
-      const item = document.createElement('div');
 
-      const editorPath = editor.getPath();
-
-      if (!(editorPath != null)) {
-        throw new Error('Invariant violation: "editorPath != null"');
-      }
-
+      const editorPath = (0, (_nullthrows || _load_nullthrows()).default)(editor.getPath());
       this._actionCreators.registerPatchEditor(editorPath, patch);
 
-      const element = _react.default.createElement((_InteractiveFileChanges || _load_InteractiveFileChanges()).default, {
-        onConfirm: content => onConfirm(editor, content),
-        onManualEdit: () => onManualEdit(editor, diffContent, marker, editorView),
-        onQuit: () => atom.workspace.getActivePane().destroyItem(editor),
-        patch: patch
-      });
-      _reactDom.default.render(element, item);
-      item.style.visibility = 'visible';
+      const BoundPatchEditor = (0, (_bindObservableAsProps || _load_bindObservableAsProps()).bindObservableAsProps)(this._states.map(state => {
+        return {
+          actionCreators: this._actionCreators,
+          onConfirm: content => onConfirm(editor, content, marker),
+          onManualEdit: () => onManualEdit(editor, diffContent, marker, editorView),
+          onQuit: () => onQuit(editor),
+          patchId: editorPath,
+          patchData: state.patchEditors.get(editorPath)
+        };
+      }), (_PatchEditor || _load_PatchEditor()).default);
+      const item = (0, (_viewableFromReactElement || _load_viewableFromReactElement()).viewableFromReactElement)(_react.default.createElement(BoundPatchEditor, null));
+      item.element.style.visibility = 'visible';
 
-      const marker = editor.markScreenPosition([0, 0]);
       editor.decorateMarker(marker, {
         type: 'block',
         item
       });
 
       marker.onDidDestroy(() => {
-        _reactDom.default.unmountComponentAtNode(item);
+        item.destroy();
         this._actionCreators.deregisterPatchEditor(editorPath);
       });
     }
   }
-} /**
-   * Copyright (c) 2015-present, Facebook, Inc.
-   * All rights reserved.
-   *
-   * This source code is licensed under the license found in the LICENSE file in
-   * the root directory of this source tree.
-   *
-   * 
-   */
+}
 
-function onConfirm(editor, content) {
-  editor.setText(content);
-  editor.save();
+function onQuit(editor) {
+  (0, (_nuclideAnalytics || _load_nuclideAnalytics()).track)('patch-editor-quit');
   atom.workspace.getActivePane().destroyItem(editor);
 }
 
+function onConfirm(editor, content, marker) {
+  (0, (_nuclideAnalytics || _load_nuclideAnalytics()).track)('patch-editor-confirm');
+  marker.destroy();
+  editor.setText(content);
+  editor.onDidSave(() => atom.workspace.getActivePane().destroyItem(editor));
+  editor.save();
+}
+
 function onManualEdit(editor, content, marker, editorView) {
+  (0, (_nuclideAnalytics || _load_nuclideAnalytics()).track)('patch-editor-manual');
   editor.setText(content);
   editor.save();
   editor.setGrammar(atom.grammars.grammarForScopeName('source.mercurial.diff'));

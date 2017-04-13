@@ -231,7 +231,7 @@ class NuclideSettingsPaneItem extends _react.default.Component {
   }
 
   getDefaultLocation() {
-    return 'pane';
+    return 'center';
   }
 
   getURI() {

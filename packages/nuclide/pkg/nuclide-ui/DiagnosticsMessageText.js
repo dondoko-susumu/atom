@@ -50,8 +50,11 @@ function separateUrls(message) {
    * 
    */
 
-function renderTextWithLinks(message) {
-  const parts = separateUrls(message).map((part, index) => {
+const LEADING_WHITESPACE_RE = /^\s+/;
+const NBSP = '\xa0';
+function renderRowWithLinks(message, rowIndex) {
+  const messageWithWhitespace = message.replace(LEADING_WHITESPACE_RE, whitespace => NBSP.repeat(whitespace.length));
+  const parts = separateUrls(messageWithWhitespace).map((part, index) => {
     if (!part.isUrl) {
       return part.text;
     } else {
@@ -67,8 +70,8 @@ function renderTextWithLinks(message) {
   });
 
   return _react.default.createElement(
-    'span',
-    null,
+    'div',
+    { key: rowIndex },
     parts
   );
 }
@@ -83,7 +86,7 @@ const DiagnosticsMessageText = exports.DiagnosticsMessageText = props => {
     return _react.default.createElement(
       'span',
       null,
-      renderTextWithLinks(message.text)
+      message.text.split('\n').map(renderRowWithLinks)
     );
   } else {
     return _react.default.createElement(

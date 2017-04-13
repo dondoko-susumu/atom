@@ -7,14 +7,8 @@ _ = require 'underscore-plus'
 
 settings = require './settings'
 HoverManager = require './hover-manager'
-SearchInputElement = require './search-input'
-{
-  getVisibleEditors
-  matchScopes
-  assert
-  assertWithException
-  translatePointAndClip
-} = require './utils'
+SearchInput = require './search-input'
+{getVisibleEditors, matchScopes, translatePointAndClip, haveSomeNonEmptySelection} = require './utils'
 swrap = require './selection-wrapper'
 
 OperationStack = require './operation-stack'
@@ -67,9 +61,7 @@ class VimState
     @occurrenceManager = new OccurrenceManager(this)
     @mutationManager = new MutationManager(this)
     @flashManager = new FlashManager(this)
-
-    @searchInput = new SearchInputElement().initialize(this)
-
+    @searchInput = new SearchInput(this)
     @operationStack = new OperationStack(this)
     @cursorStyleManager = new CursorStyleManager(this)
     @blockwiseSelections = []
@@ -88,12 +80,6 @@ class VimState
 
     @subscriptions.add @editor.onDidDestroy(@destroy.bind(this))
     @constructor.vimStatesByEditor.set(@editor, this)
-
-  assert: (args...) ->
-    assert(args...)
-
-  assertWithException: (args...) ->
-    assertWithException(args...)
 
   getConfig: (param) ->
     settings.get(param)
@@ -157,9 +143,6 @@ class VimState
 
   onDidFinishMutation: (fn) -> @subscribe @emitter.on('on-did-finish-mutation', fn)
   emitDidFinishMutation: -> @emitter.emit('on-did-finish-mutation')
-
-  onDidRestoreCursorPositions: (fn) -> @subscribe @emitter.on('did-restore-cursor-positions', fn)
-  emitDidRestoreCursorPositions: (event) -> @emitter.emit('did-restore-cursor-positions', event)
 
   onDidSetOperatorModifier: (fn) -> @subscribe @emitter.on('did-set-operator-modifier', fn)
   emitDidSetOperatorModifier: (options) -> @emitter.emit('did-set-operator-modifier', options)
@@ -234,39 +217,26 @@ class VimState
     } = {}
     @emitter.emit 'did-destroy'
 
-  isInterestingEvent: ({target, type}) ->
-    if @mode is 'insert'
-      false
-    else
-      @editor? and
-        target?.closest?('atom-text-editor') is @editorElement and
-        not @isMode('visual', 'blockwise') and
-        not type.startsWith('vim-mode-plus:')
-
   checkSelection: (event) ->
+    return unless atom.workspace.getActiveTextEditor() is @editor
     return if @operationStack.isProcessing()
-    return unless @isInterestingEvent(event)
+    return if @mode is 'insert'
+    # Intentionally using target.closest('atom-text-editor')
+    # Don't use target.getModel() which is work for CustomEvent but not work for mouse event.
+    return unless @editorElement is event.target?.closest?('atom-text-editor')
+    return if event.type.startsWith('vim-mode-plus') # to match vim-mode-plus: and vim-mode-plus-user:
 
-    nonEmptySelecitons = @editor.getSelections().filter (selection) -> not selection.isEmpty()
-    if nonEmptySelecitons.length
-      wise = swrap.detectWise(@editor)
+    if haveSomeNonEmptySelection(@editor)
       @editorElement.component.updateSync()
+      wise = swrap.detectWise(@editor)
       if @isMode('visual', wise)
         for $selection in swrap.getSelections(@editor)
-          if $selection.hasProperties()
-            $selection.fixPropertyRowToRowRange() if wise is 'linewise'
-          else
-            $selection.saveProperties()
+          $selection.saveProperties()
         @updateCursorsVisibility()
       else
         @activate('visual', wise)
     else
       @activate('normal') if @mode is 'visual'
-
-  saveProperties: (event) ->
-    return unless @isInterestingEvent(event)
-    for selection in @editor.getSelections()
-      swrap(selection).saveProperties()
 
   observeSelections: ->
     checkSelection = @checkSelection.bind(this)
@@ -274,11 +244,11 @@ class VimState
     @subscriptions.add new Disposable =>
       @editorElement.removeEventListener('mouseup', checkSelection)
 
-    # [FIXME]
-    # Hover position get wired when focus-change between more than two pane.
-    # commenting out is far better than introducing Buggy behavior.
-    # @subscriptions.add atom.commands.onWillDispatch(saveProperties)
     @subscriptions.add atom.commands.onDidDispatch(checkSelection)
+
+    @editorElement.addEventListener('focus', checkSelection)
+    @subscriptions.add new Disposable =>
+      @editorElement.removeEventListener('focus', checkSelection)
 
   # What's this?
   # editor.clearSelections() doesn't respect lastCursor positoin.
@@ -339,7 +309,8 @@ class VimState
       [start, end] = [head, tail]
       tail = end = translatePointAndClip(@editor, end, 'forward')
 
-    @mark.setRange('<', '>', [start, end])
+    @mark.set('<', start)
+    @mark.set('>', end)
     @previousSelection = {properties: {head, tail}, @submode}
 
   # Persistent selection

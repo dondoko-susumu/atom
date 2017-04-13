@@ -96,6 +96,8 @@ class HhvmToolbar extends _react.default.Component {
   render() {
     const store = this.props.projectStore;
     const isDebugScript = store.getDebugMode() === 'script';
+    const isDisabled = !isDebugScript;
+    const value = store.getDebugTarget();
     return _react.default.createElement(
       'div',
       { className: 'hhvm-toolbar' },
@@ -112,9 +114,14 @@ class HhvmToolbar extends _react.default.Component {
         { className: 'inline-block', style: { width: '300px' } },
         _react.default.createElement((_AtomInput || _load_AtomInput()).AtomInput, {
           ref: 'debugTarget',
-          initialValue: store.getDebugTarget(),
-          disabled: !isDebugScript,
-          onDidChange: this._updateLastScriptCommand,
+          initialValue: value
+          // Ugly hack: prevent people changing the value without disabling so
+          // that they can copy and paste.
+          , onDidChange: isDisabled ? () => {
+            if (this.refs.debugTarget.getText() !== value) {
+              this.refs.debugTarget.setText(value);
+            }
+          } : this._updateLastScriptCommand,
           size: 'sm'
         })
       ),

@@ -274,6 +274,11 @@ class VimEditor
       when 1 then [options] = args
       when 2 then [keystroke, options] = args
 
+    unless typeof(options) is 'object'
+      throw new Error("Invalid options for 'ensure': must be 'object' but got '#{typeof(options)}'")
+    if keystroke? and not (typeof(keystroke) is 'string' or Array.isArray(keystroke))
+      throw new Error("Invalid keystroke for 'ensure': must be 'string' or 'array' but got '#{typeof(keystroke)}'")
+
     keystrokeOptions = @getAndDeleteKeystrokeOptions(options)
 
     @validateOptions(options, ensureOptionsOrdered, 'Invalid ensure option')
@@ -283,6 +288,20 @@ class VimEditor
     unless _.isEmpty(keystroke)
       @keystroke(keystroke, keystrokeOptions)
 
+    for name in ensureOptionsOrdered when options[name]?
+      method = 'ensure' + _.capitalize(_.camelize(name))
+      this[method](options[name])
+
+  bindEnsureOption: (optionsBase) =>
+    (keystroke, options) =>
+      intersectingOptions = _.intersection(_.keys(options), _.keys(optionsBase))
+      if intersectingOptions.length
+        throw new Error("conflict with bound options #{inspect(intersectingOptions)}")
+
+      @ensure(keystroke, _.defaults(_.clone(options), optionsBase))
+
+  ensureByDispatch: (command, options) =>
+    dispatch(atom.views.getView(@editor), command)
     for name in ensureOptionsOrdered when options[name]?
       method = 'ensure' + _.capitalize(_.camelize(name))
       this[method](options[name])

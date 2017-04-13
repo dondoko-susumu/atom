@@ -212,7 +212,7 @@ class HomePaneItem extends _react.default.Component {
   }
 
   getDefaultLocation() {
-    return 'pane';
+    return 'center';
   }
 
   componentWillUnmount() {

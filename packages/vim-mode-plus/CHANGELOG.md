@@ -1,3 +1,113 @@
+# 0.88.0:
+- Doc: New wiki page
+  - DifferencesFromPureVim
+  - VmpUniqueKeymaps
+- Keymaps: Normal keymap addition
+  - New: Now `subword` text-object have default keymap, you can change subword by `c i d`.
+    - `i d`: `inner-subword`
+    - `a d`: `a-subword`
+  - `cmd-a` is mapped to `inner-entire` in `operator-pending` and `visual-mode` for macOS user.
+    - So macOS user can use `cmd-a` as shorthand of `i e`(`inner-entire`).
+    - E.g. Change all occurrence in text by `c o cmd-a` instead of `c o i e`
+- Keymaps: Shorthand keymaps in `operator-pending` mode
+  - Prerequisite
+    - In `operator-pending-mode`, next command must be `text-object` or `motion`
+    - So all `operator` command in `operator-pending-mode` is INVALID.
+    - This mean, we can safely use operator command's keymap in `operator-pending-mode` as shorthand keymap of `text-object` or `motion`.
+    - But using these keymap for `motion` is meaningless since motion is single-key, but text-object key is two keystroke(e.g. `i w`).
+    - So I pre-defined short-hand keymap for text-object which was work for me.
+  - What was defined?
+    - `c` as shorthand of `inner-smart-word`, but `c c` is not affected.
+      - You can `yank word` by `y c` instead of `y i w`. ( change by `c c` if you enabled it in setting )
+      - To make `c c` works for `change inner-smart-word`, set `keymapCCToChangeInnerSmartWord` to `true`( `false` by default )
+      - `smart-word` is similar to `word` but it's include `-` char.
+    - `C` as shorthand of `inner-whole-word`
+      - You can `yank whole-word` by `y C` instead of `y i W`. ( change by `c C` )
+    - `d` as shorthand of `inner-subword`, but `d d` is not affected.
+      - You can `yank subword` by `y d` instead of `y i d`. ( change by `c d` )
+    - `p` as shorthand of `inner-paragraph`
+      - You can `yank paragraph` by `y p` instead of `y i p`. ( change by `c p` )
+- Keymaps: Conditional keymap enabled by setting.
+  - Prerequisite
+    - Added several configuration option which is 1-to-1 mapped to keymap.
+    - When set to `true`, corresponding keymap is defined.
+    - This is just as helper to define complex keymap via checkbox.
+    - For me, I enabled all of these setting and I want strongly recommend you to evaluate these setting at least once.
+    - These keymaps are picked from my local keymap which was realy work well for a log time.
+  - Here is new setting, all `false` by default. Effect(good and bad) of these keymap is explained in vmp's setting-view.
+    - `keymapUnderscoreToReplaceWithRegister`
+    - `keymapCCToChangeInnerSmartWord`
+    - `keymapSemicolonToInnerAnyPairInOperatorPendingMode`
+    - `keymapSemicolonToInnerAnyPairInVisualMode`
+    - `keymapBackslashToInnerCommentOrParagraphWhenToggleLineCommentsIsPending`
+- Breaking: Default setting change:
+  - `clearPersistentSelectionOnResetNormalMode`: `true`( `false` in previous version )
+  - `clearHighlightSearchOnResetNormalMode`: `true`( `false` in previous version )
+  - `highlightSearch`: `true`( `false` in previous version )
+  - `useClipboardAsDefaultRegister`: `true`( `false` in previous version )
+- New: #743, #739 New config option `dontUpdateRegisterOnChangeOrSubstitute`( default `false` ).
+  - When set to `true`, all `c`, `s`, `C`, `S` operation no longer update register content.
+  - If you want keep register content unchanged by `c i w`, set this to `false`.
+- New: TextObject `comment-or-paragraph` for use of easy comment-in/out when `g /` is pending.
+- Fix: For commands `set-register-name-to-*` or `set-register-name-to-_`, now show hover and correctly set `with-register` CSS scope on editorElement.
+- Fix, Improve: #744 Make vmp work well with other atom-pkg or atom's native feature.
+  - Update selection prop on command dispatch of outer-vmp command
+    - Now correctly update cursor visibility and start `visual-mode` after `cmd-e` then `cmd-g`.
+  - Update selection prop if editor retake `focus`.
+    - Now correctly start `visual-mode` after `cmd-f` result was confirmed by `enter`.
+- Improve: Better integration with `demo-mode` package
+  - Postpone destroying operator-flash while demo-mode's hover indicator is displayed.
+- Improve: When undo/redoing occurrence operation, flash was suppressed when all occurrence start and end with same column, but now flashed.
+- Improve: Improve containment check for `togggle-preset-occurrence`
+  - When cursor is at right column of non-word char(e.g. closing parenthesis `)`), not longer misunderstand that cursor is on occurrence-marker.
+- Internal: #742 Rewrite `RegisterManager`, reduced complex logic which make me really confuse.
+
+# 0.87.0:
+- New: #732 Add integration with `demo-mode` package.
+  - `demo-mode` is new Atom package I've released recently, it was originally developed as part of vim-mode-plus.
+  - When demo-mode is activated via `demo-mode:toggle`, vmp do special integration to
+    - Make operator flash duration longer than normal duration
+    - Demo-mode hover indicator show `keystorke`, `command` and `kind`(extra info added by vmp) on each keybinding dispatch.
+      - kind is one of `operator`, `text-object`, `motion`, `misc-command`
+- New: #722 New version of put command which paste content to suggested indent level with keeping pasting text layout.
+  - PR by @apazzolini
+  - Normal `p`, `P` paste content as-is, so ignores desirable( or suggested ) indent level.
+  - Following two command respect suggested indent level on linewise paste( no diff for characterwise paste ).
+    - `vim-mode-plus:put-before-with-auto-indent`: Same as `put-before`(`P`) with respect suggested indent level.
+    - `vim-mode-plus:put-after-with-auto-indent`:  Same as `put-after`(`p`) with respect suggested indent level.
+  - No keymaps provided by default
+- Improve: `o`, `O` to adjust IndentLevel when `o`, `O` is executed from empty row #723
+  - PR by @apazzolini
+  - To provider further pure-Vim compatible behavior.
+
+# 0.86.3
+- Improve: #727 Tweak incremental-search match highlight style to not hide covering text in some syntax-theme.
+
+# 0.86.2
+- Fix: #725 Now `v`( or `V` or `ctrl-v`) then `escape g v` correctly re-select previously selected range.
+- Improve: #726 Relax selection-property assertion.
+  - Fix: #716 No longer throw error when confirming color via color-picker then `escape`.
+
+# 0.86.0, 0.86.1(just changelog-typo-fix):
+- New: `insert-at-start-of-subword-occurrence` and `insert-at-end-of-subword-occurrence` command.
+  - Start insert at start or end of `subword` occurrence.
+  - E.g
+    - When I map `{`, and `}` to these command in `normal-mode`.
+      - `{ f`: start insert at each start of subword-occurrence within function.
+      - `} f`: start insert at each end of subword-occurrence within function.
+      - `{ p`: start insert at each start of subword-occurrence within paragraph.
+- Internal, Breaking: Remove `did-restore-cursor-positions` hook which was used in Operator code but no longer used.
+- Internal, Breaking: Remove many of simple accessor method like `getName`, `getOperator`, now just use `@name`, `@operator` to access these values.
+- Improve: Hide cursor on early select
+   - For `supportEarlySelect = true` operator( `surround`, `replace` ).
+   - These operator began to shows cursor on early-select from Atom v1.15, but now hide again for early-select timing.
+- Internal, Dev: #719 No longer use `HTMLElement` as search-input for speedy dev by hot-reload vmp.
+- Internal, Breaking: Move `InsertMode`(was in `insert-mode.coffee`) operations under `MiscCommands`( in `misc-commands.coffee`)
+- Improve: Keep original multi-cursor on occurrence operation by migrating mutation info.
+- Improve: Simplify mark manager and destroy all marker on `vimState.onDidDestroy`.
+- Improve: Clean up mutationManager.
+- Fix, Internal: Now do TYPE check for spec-helper's `ensure` function's argument, some test was silently skipped in previous release.
+
 # 0.85.1:
 - Fix, SUPER Critical: #175 Moving cursor in `visual-mode` make Atom editor really slow.
   - vmp's mark is stored as marker and was created limitlessly without destroying previous-marker.

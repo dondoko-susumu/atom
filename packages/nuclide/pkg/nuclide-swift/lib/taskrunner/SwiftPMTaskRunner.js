@@ -187,7 +187,7 @@ class SwiftPMTaskRunner {
     atom.commands.dispatch(atom.views.getView(atom.workspace), 'nuclide-console:toggle', { visible: true });
     this._logOutput(`${command.command} ${command.args.join(' ')}`, 'log');
 
-    const observable = (0, (_process || _load_process()).observeProcess)(() => (0, (_process || _load_process()).safeSpawn)(command.command, command.args)).do(message => {
+    const observable = (0, (_process || _load_process()).observeProcess)(command.command, command.args).do(message => {
       switch (message.kind) {
         case 'stderr':
         case 'stdout':

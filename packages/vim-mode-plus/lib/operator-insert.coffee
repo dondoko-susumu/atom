@@ -5,6 +5,7 @@ _ = require 'underscore-plus'
   moveCursorLeft
   moveCursorRight
   limitNumber
+  isEmptyRow
 } = require './utils'
 swrap = require './selection-wrapper'
 Operator = require('./base').getClass('Operator')
@@ -29,8 +30,7 @@ class ActivateInsertMode extends Operator
       textByUserInput = ''
       if change = @getChangeSinceCheckpoint('insert')
         @lastChange = change
-        changedRange = new Range(change.start, change.start.traverse(change.newExtent))
-        @vimState.mark.setRange('[', ']', changedRange)
+        @setMarkForChange(new Range(change.start, change.start.traverse(change.newExtent)))
         textByUserInput = change.newText
       @vimState.register.set('.', text: textByUserInput) # Last inserted text
 
@@ -88,11 +88,11 @@ class ActivateInsertMode extends Operator
     limitNumber(@insertionCount, max: 100)
 
   execute: ->
-    if @isRepeated()
+    if @repeated
       @flashTarget = @trackChange = true
 
       @startMutation =>
-        @selectTarget() if @isRequireTarget()
+        @selectTarget() if @target?
         @mutateText?()
         for selection in @editor.getSelections()
           @repeatInsert(selection, @lastChange?.newText ? '')
@@ -103,9 +103,9 @@ class ActivateInsertMode extends Operator
         @vimState.clearSelections()
 
     else
-      @normalizeSelectionsIfNecessary() if @isRequireTarget()
+      @normalizeSelectionsIfNecessary()
       @createBufferCheckpoint('undo')
-      @selectTarget() if @isRequireTarget()
+      @selectTarget() if @target?
       @observeWillDeactivateMode()
 
       @mutateText?()
@@ -185,8 +185,14 @@ class InsertAboveWithNewline extends ActivateInsertMode
 
     lastCursor.setBufferPosition(cursorPosition)
 
+  autoIndentEmptyRows: ->
+    for cursor in @editor.getCursors()
+      row = cursor.getBufferRow()
+      @editor.autoIndentBufferRow(row) if isEmptyRow(@editor, row)
+
   mutateText: ->
     @editor.insertNewlineAbove()
+    @autoIndentEmptyRows() if @editor.autoIndent
 
   repeatInsert: (selection, text) ->
     selection.insertText(text.trimLeft(), autoIndent: true)
@@ -195,6 +201,7 @@ class InsertBelowWithNewline extends InsertAboveWithNewline
   @extend()
   mutateText: ->
     @editor.insertNewlineBelow()
+    @autoIndentEmptyRows() if @editor.autoIndent
 
 # Advanced Insertion
 # -------------------------
@@ -251,6 +258,14 @@ class InsertAtEndOfOccurrence extends InsertByTarget
   which: 'end'
   occurrence: true
 
+class InsertAtStartOfSubwordOccurrence extends InsertAtStartOfOccurrence
+  @extend()
+  occurrenceType: 'subword'
+
+class InsertAtEndOfSubwordOccurrence extends InsertAtEndOfOccurrence
+  @extend()
+  occurrenceType: 'subword'
+
 class InsertAtStartOfSmartWord extends InsertByTarget
   @extend()
   which: 'start'
@@ -288,7 +303,7 @@ class Change extends ActivateInsertMode
     #   }
     isLinewiseTarget = swrap.detectWise(@editor) is 'linewise'
     for selection in @editor.getSelections()
-      @setTextToRegisterForSelection(selection)
+      @setTextToRegisterForSelection(selection) unless @getConfig('dontUpdateRegisterOnChangeOrSubstitute')
       if isLinewiseTarget
         selection.insertText("\n", autoIndent: true)
         selection.cursor.moveLeft()

@@ -9,10 +9,22 @@ exports.parseWithAnnotations = parseWithAnnotations;
 exports.createPatchData = createPatchData;
 exports.createHunkData = createHunkData;
 
+var _nullthrows;
+
+function _load_nullthrows() {
+  return _nullthrows = _interopRequireDefault(require('nullthrows'));
+}
+
 var _diffparser;
 
 function _load_diffparser() {
   return _diffparser = _interopRequireDefault(require('diffparser'));
+}
+
+var _constants;
+
+function _load_constants() {
+  return _constants = require('./constants');
 }
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
@@ -29,21 +41,41 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
  * 
  */
 
-function patchToString(patch) {
+function patchToString(patchData) {
   const lines = [];
 
-  patch.forEach(fileDiff => {
+  patchData.files.forEach(fileData => {
+    if (fileData.selected === (_constants || _load_constants()).SelectedState.NONE) {
+      return;
+    }
+    const fileDiff = fileData.fileDiff;
     lines.push(`diff --git a/${fileDiff.from} b/${fileDiff.to}`);
     if (!isSpecialChange(fileDiff)) {
       lines.push(`--- a/${fileDiff.from}\n+++ b/${fileDiff.to}`);
       fileDiff.chunks.forEach(hunk => {
+        const hunkData = (0, (_nullthrows || _load_nullthrows()).default)((0, (_nullthrows || _load_nullthrows()).default)(fileData.chunks).get(hunk.oldStart));
+        if (hunkData.selected === (_constants || _load_constants()).SelectedState.NONE) {
+          return;
+        }
         lines.push(hunk.content);
-        hunk.changes.forEach(change => lines.push(change.content));
+        hunk.changes.forEach((change, index) => {
+          if (change.type !== 'normal') {
+            if (hunkData.allChanges[index - hunkData.firstChangedLineIndex]) {
+              lines.push(change.content);
+            } else if (change.type === 'del') {
+              // disabling a 'del' line replaces the '-' prefix with ' '
+              lines.push(' ' + change.content.substr(1));
+            }
+            // Don't push disabled 'add' lines
+          } else {
+            lines.push(change.content);
+          }
+        });
       });
     }
   });
 
-  return lines.join('\n') + '\n';
+  return lines.join('\n') + '\n'; // end file with a newline
 }
 
 // Special changes only require the first line of the header be printed
@@ -76,23 +108,27 @@ function parseWithAnnotations(diffContent) {
 
 function createPatchData(patch) {
   return {
-    files: new Map(patch.map(fileDiff => [fileDiff.to, {
-      chunks: isSpecialChange(fileDiff) ? null : new Map(fileDiff.chunks.map(chunk => [chunk.oldStart, createHunkData(chunk)])),
-      collapsed: false,
-      countEnabledChunks: fileDiff.chunks.length,
-      fileDiff,
-      selected: 'all'
-    }]))
+    files: new Map(patch.map(fileDiff => {
+      const id = `${fileDiff.to}:${fileDiff.from}`;
+      return [id, {
+        chunks: isSpecialChange(fileDiff) ? null : new Map(fileDiff.chunks.map(chunk => [chunk.oldStart, createHunkData(chunk)])),
+        countEnabledChunks: fileDiff.chunks.length,
+        countPartialChunks: 0,
+        fileDiff,
+        id,
+        selected: (_constants || _load_constants()).SelectedState.ALL
+      }];
+    }))
   };
 }
 
 function createHunkData(hunk) {
-  const lines = hunk.changes.map(change => change.type !== 'normal').filter(isChange => isChange);
+  const allChanges = hunk.changes.map(change => change.type !== 'normal').filter(isChange => isChange);
+  const firstChangedLineIndex = hunk.changes.findIndex(change => change.type !== 'normal');
   return {
-    collapsed: false,
-    countAllChanges: lines.length,
-    countEnabledChanges: lines.length,
-    lines,
-    selected: 'all'
+    allChanges,
+    countEnabledChanges: allChanges.length,
+    firstChangedLineIndex,
+    selected: (_constants || _load_constants()).SelectedState.ALL
   };
 }
