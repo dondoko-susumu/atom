@@ -2,40 +2,40 @@
   "_args": [
     [
       {
-        "raw": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117311-23282-1gfpnvc/package.tgz",
+        "raw": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117314-29681-1cd8sv6.j82l7ynwmi/package.tgz",
         "scope": null,
         "escapedName": null,
         "name": null,
-        "rawSpec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117311-23282-1gfpnvc/package.tgz",
-        "spec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117311-23282-1gfpnvc/package.tgz",
+        "rawSpec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117314-29681-1cd8sv6.j82l7ynwmi/package.tgz",
+        "spec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117314-29681-1cd8sv6.j82l7ynwmi/package.tgz",
         "type": "local"
       },
-      "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/apm-install-dir-117311-23282-gvtjli"
+      "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/apm-install-dir-117314-29681-1kp95iu.vtdsn0cnmi"
     ]
   ],
-  "_from": "../d-117311-23282-1gfpnvc/package.tgz",
-  "_id": "vim-mode-plus@0.88.0",
+  "_from": "../d-117314-29681-1cd8sv6.j82l7ynwmi/package.tgz",
+  "_id": "vim-mode-plus@0.89.0",
   "_inCache": true,
   "_installable": true,
   "_location": "/vim-mode-plus",
   "_phantomChildren": {},
   "_requested": {
-    "raw": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117311-23282-1gfpnvc/package.tgz",
+    "raw": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117314-29681-1cd8sv6.j82l7ynwmi/package.tgz",
     "scope": null,
     "escapedName": null,
     "name": null,
-    "rawSpec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117311-23282-1gfpnvc/package.tgz",
-    "spec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117311-23282-1gfpnvc/package.tgz",
+    "rawSpec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117314-29681-1cd8sv6.j82l7ynwmi/package.tgz",
+    "spec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117314-29681-1cd8sv6.j82l7ynwmi/package.tgz",
     "type": "local"
   },
   "_requiredBy": [
     "#USER"
   ],
-  "_resolved": "file:../d-117311-23282-1gfpnvc/package.tgz",
-  "_shasum": "ff24c2077ea02ea0cc13b22ec5347333d5b38fb6",
+  "_resolved": "file:../d-117314-29681-1cd8sv6.j82l7ynwmi/package.tgz",
+  "_shasum": "8310fe2772184c57b17fc8259d4d5e5d6f7062d2",
   "_shrinkwrap": null,
-  "_spec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117311-23282-1gfpnvc/package.tgz",
-  "_where": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/apm-install-dir-117311-23282-gvtjli",
+  "_spec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117314-29681-1cd8sv6.j82l7ynwmi/package.tgz",
+  "_where": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/apm-install-dir-117314-29681-1kp95iu.vtdsn0cnmi",
   "bugs": {
     "url": "https://github.com/t9md/atom-vim-mode-plus/issues"
   },
@@ -91,5 +91,5 @@
     "test": "apm test",
     "watch": "fswatch -0 spec lib | xargs -0 -n1 -I{} apm test"
   },
-  "version": "0.88.0"
+  "version": "0.89.0"
 }

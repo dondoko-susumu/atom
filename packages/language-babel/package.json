@@ -2,40 +2,40 @@
   "_args": [
     [
       {
-        "raw": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-11731-34958-1tao1yu/package.tgz",
+        "raw": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117314-29673-kov9e0.e9x4t8d7vi/package.tgz",
         "scope": null,
         "escapedName": null,
         "name": null,
-        "rawSpec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-11731-34958-1tao1yu/package.tgz",
-        "spec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-11731-34958-1tao1yu/package.tgz",
+        "rawSpec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117314-29673-kov9e0.e9x4t8d7vi/package.tgz",
+        "spec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117314-29673-kov9e0.e9x4t8d7vi/package.tgz",
         "type": "local"
       },
-      "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/apm-install-dir-11731-34958-us3zia"
+      "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/apm-install-dir-117314-29673-6at999.appu7q4cxr"
     ]
   ],
-  "_from": "../d-11731-34958-1tao1yu/package.tgz",
-  "_id": "language-babel@2.57.2",
+  "_from": "../d-117314-29673-kov9e0.e9x4t8d7vi/package.tgz",
+  "_id": "language-babel@2.57.3",
   "_inCache": true,
   "_installable": true,
   "_location": "/language-babel",
   "_phantomChildren": {},
   "_requested": {
-    "raw": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-11731-34958-1tao1yu/package.tgz",
+    "raw": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117314-29673-kov9e0.e9x4t8d7vi/package.tgz",
     "scope": null,
     "escapedName": null,
     "name": null,
-    "rawSpec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-11731-34958-1tao1yu/package.tgz",
-    "spec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-11731-34958-1tao1yu/package.tgz",
+    "rawSpec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117314-29673-kov9e0.e9x4t8d7vi/package.tgz",
+    "spec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117314-29673-kov9e0.e9x4t8d7vi/package.tgz",
     "type": "local"
   },
   "_requiredBy": [
     "#USER"
   ],
-  "_resolved": "file:../d-11731-34958-1tao1yu/package.tgz",
-  "_shasum": "f010a167fb73803334862f669a332a015e459a59",
+  "_resolved": "file:../d-117314-29673-kov9e0.e9x4t8d7vi/package.tgz",
+  "_shasum": "37cde6832d8aac5dfc72cb42eb0e22c7bb24295a",
   "_shrinkwrap": null,
-  "_spec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-11731-34958-1tao1yu/package.tgz",
-  "_where": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/apm-install-dir-11731-34958-us3zia",
+  "_spec": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/d-117314-29673-kov9e0.e9x4t8d7vi/package.tgz",
+  "_where": "/private/var/folders/lc/h6flghr94hj2_slddh24zn300000gn/T/apm-install-dir-117314-29673-6at999.appu7q4cxr",
   "activationCommands": [],
   "bugs": {
     "url": "https://github.com/gandm/language-babel/issues"
@@ -194,5 +194,5 @@
     "type": "git",
     "url": "git+https://github.com/gandm/language-babel.git"
   },
-  "version": "2.57.2"
+  "version": "2.57.3"
 }
